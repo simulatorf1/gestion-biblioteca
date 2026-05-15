@@ -114,7 +114,11 @@ const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
 // ========================================================
 
-const supabase = supabase_js.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Evitar redeclaración por scripts externos
+if (typeof window.supabaseClient === "undefined") {
+    window.supabaseClient = supabase_js.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+const supabase = window.supabaseClient;
 
 // Variables globales
 let html5QrCode = null;
@@ -521,6 +525,8 @@ document.getElementById("btnPendientes").addEventListener("click", mostrarPendie
 document.getElementById("btnBuscar").addEventListener("click", buscarAlumno);
 document.getElementById("btnCerrarScanner").addEventListener("click", cerrarScanner);
 
+// Limpiar referencia global al terminar para evitar conflictos
+window.supabaseClient = supabase;    
 // Iniciar
 menuPrincipal();
 </script>
