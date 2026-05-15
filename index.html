@@ -240,7 +240,7 @@
             <div id="listaAlumnos"></div>
         </div>`;
         document.getElementById('mainPanel').innerHTML = html;
-        document.getElementById('btnNuevoAlumno').onclick = () => mostrarFormularioAlumno(null);
+        document.getElementById('btnNuevoAlumno').onclick = () => editarAlumno(null);
         document.getElementById('buscarAlumnoInput').oninput = () => filtrarAlumnos(historial || []);
         window.historialAlumnosGlobal = historial || [];
         filtrarAlumnos(historial || []);
@@ -248,7 +248,7 @@
     
     function filtrarAlumnos(historial) {
         const search = document.getElementById('buscarAlumnoInput')?.value.toLowerCase() || '';
-        const filtered = historial.filter(h => h.alumnos && (h.alumnos.nombre?.toLowerCase().includes(search) || h.alumnos.apellidos?.toLowerCase().includes(search)));
+        const filtered = historial.filter(h => h.alumnos && (h.alumnos.nombre?.toLowerCase().includes(search) || (h.alumnos.apellidos?.toLowerCase().includes(search) || false)));
         const container = document.getElementById('listaAlumnos');
         if (!container) return;
         if (filtered.length === 0) { container.innerHTML = '<p>No hay alumnos</p>'; return; }
@@ -256,7 +256,7 @@
         filtered.forEach(h => {
             html += `<div class="alumno-row">
                 <div class="alumno-info">
-                    <strong>${h.alumnos.nombre} ${h.alumnos.apellidos}</strong><br>
+                    <strong>${h.alumnos.nombre} ${h.alumnos.apellidos || ''}</strong><br>
                     ${h.curso || ''} ${h.grupo || ''} | Beca: ${h.beca ? 'Sí' : 'No'} | Socio: ${h.socio_ampa ? 'Sí' : 'No'}
                 </div>
                 <div class="alumno-actions">
@@ -270,15 +270,23 @@
     
     window.editarAlumno = async (alumnoId) => {
         currentEditingAlumnoId = alumnoId;
-        const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
-        const { data: historialActual } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).maybeSingle();
-        const { data: prestamos } = await supabase.from('prestamos').select('*, libros(*)').eq('alumno_id', alumnoId).eq('entregado', false);
+        let alumno = null;
+        let historialActual = null;
+        
+        if(alumnoId) {
+            const { data: a } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
+            alumno = a;
+            const { data: h } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).maybeSingle();
+            historialActual = h;
+        }
+        
+        const { data: prestamos } = alumnoId ? await supabase.from('prestamos').select('*, libros(*)').eq('alumno_id', alumnoId).eq('entregado', false) : { data: [] };
         
         let html = `<div class="card">
-            <h2>✏️ Editando: ${alumno.nombre} ${alumno.apellidos}</h2>
+            <h2>${alumnoId ? '✏️ Editando: ' + (alumno?.nombre || '') + ' ' + (alumno?.apellidos || '') : '➕ Nuevo Alumno'}</h2>
             <div class="form-grid">
-                <div><label>Nombre</label><input id="editNombre" value="${alumno.nombre || ''}"></div>
-                <div><label>Apellidos</label><input id="editApellidos" value="${alumno.apellidos || ''}"></div>
+                <div><label>Nombre</label><input id="editNombre" value="${alumno?.nombre || ''}"></div>
+                <div><label>Apellidos</label><input id="editApellidos" value="${alumno?.apellidos || ''}"></div>
                 <div><label>Curso</label><select id="editCurso"><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
                 <div><label>Grupo</label><input id="editGrupo" value="${historialActual?.grupo || ''}"></div>
                 <div><label>Teléfono</label><input id="editTelefono" value="${historialActual?.telefono || ''}"></div>
@@ -295,13 +303,24 @@
         document.getElementById('mainPanel').innerHTML = html;
         if(document.getElementById('editCurso')) document.getElementById('editCurso').value = historialActual?.curso || '1ESO';
         document.getElementById('guardarAlumnoBtn').onclick = async () => {
-            await supabase.from('alumnos').update({ 
-                nombre: document.getElementById('editNombre').value, 
-                apellidos: document.getElementById('editApellidos').value 
-            }).eq('id', alumnoId);
+            let nuevoAlumnoId = alumnoId;
+            if(!alumnoId) {
+                const { data: nuevo, error } = await supabase.from('alumnos').insert({ 
+                    nombre: document.getElementById('editNombre').value, 
+                    apellidos: document.getElementById('editApellidos').value,
+                    codigo_barras: 'AL-' + Date.now()
+                }).select().single();
+                if(error) { alert('Error: ' + error.message); return; }
+                nuevoAlumnoId = nuevo.id;
+            } else {
+                await supabase.from('alumnos').update({ 
+                    nombre: document.getElementById('editNombre').value, 
+                    apellidos: document.getElementById('editApellidos').value 
+                }).eq('id', alumnoId);
+            }
             
             const historialData = {
-                alumno_id: alumnoId,
+                alumno_id: nuevoAlumnoId,
                 ano_academico_id: currentAnoId,
                 curso: document.getElementById('editCurso').value,
                 grupo: document.getElementById('editGrupo').value,
@@ -348,14 +367,14 @@
         if (!socios?.length) { container.innerHTML = '<p>No hay socios este año</p>'; return; }
         let listHtml = '';
         socios.forEach(s => {
-            listHtml += `<div class="alumno-row"><div><strong>${s.alumnos?.nombre} ${s.alumnos?.apellidos}</strong><br>Nº Socio: ${s.n_socio} | Pagado: ${s.fecha_pago}</div></div>`;
+            listHtml += `<div class="alumno-row"><div><strong>${s.alumnos?.nombre} ${s.alumnos?.apellidos || ''}</strong><br>Nº Socio: ${s.n_socio} | Pagado: ${s.fecha_pago}</div></div>`;
         });
         container.innerHTML = listHtml;
     }
     
     async function registrarPagoSocio() {
         const { data: alumnos } = await supabase.from('alumnos').select('*');
-        let options = alumnos.map(a => `<option value="${a.id}">${a.nombre} ${a.apellidos}</option>`).join('');
+        let options = alumnos.map(a => `<option value="${a.id}">${a.nombre} ${a.apellidos || ''}</option>`).join('');
         let html = `<div class="card"><h2>Registrar Pago AMPA</h2>
         <div class="form-grid"><div><label>Alumno</label><select id="socioAlumnoId">${options}</select></div>
         <div><label>Fecha Pago</label><input type="date" id="socioFechaPago" value="${new Date().toISOString().slice(0,10)}"></div></div>
@@ -423,7 +442,7 @@
         </div><div class="flex"><button id="crearLibroBtn">Crear</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
         document.getElementById('mainPanel').innerHTML = html;
         document.getElementById('crearLibroBtn').onclick = async () => {
-            await supabase.from('libros').insert({
+            const { error } = await supabase.from('libros').insert({
                 codigo_barras: Date.now().toString(),
                 titulo: document.getElementById('nuevoTitulo').value,
                 materia: document.getElementById('nuevaMateria').value,
@@ -431,7 +450,8 @@
                 signatura: document.getElementById('nuevaSignatura').value,
                 estado: document.getElementById('nuevoEstado').value
             });
-            alert('Libro creado');
+            if(error) alert('Error: ' + error.message);
+            else alert('Libro creado');
             cargarBiblioteca();
         };
     }
