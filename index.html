@@ -7,7 +7,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
-        /* --- Estilos Generales --- */
         * { box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, sans-serif;
@@ -19,7 +18,6 @@
             max-width: 1200px;
             margin: 0 auto;
         }
-        /* --- Barra Superior con Año Académico --- */
         .top-bar {
             background: white;
             border-radius: 16px;
@@ -47,7 +45,6 @@
             font-weight: bold;
             background: white;
         }
-        /* --- Navegación Principal --- */
         .nav-tabs {
             display: flex;
             gap: 8px;
@@ -70,7 +67,6 @@
             border-bottom: 3px solid #2563eb;
             background: #eff6ff;
         }
-        /* --- Tarjetas y Botones --- */
         .card {
             background: white;
             border-radius: 20px;
@@ -91,13 +87,6 @@
         button.secondary { background: #64748b; }
         button.danger { background: #dc2626; }
         button.success { background: #10b981; }
-        button.icon-btn {
-            background: transparent;
-            color: #2563eb;
-            padding: 4px 8px;
-            font-size: 1.2rem;
-        }
-        /* --- Tablas y Listas --- */
         .alumno-row {
             background: #f8fafc;
             padding: 16px;
@@ -112,8 +101,7 @@
         }
         .alumno-info { flex: 1; }
         .alumno-actions { display: flex; gap: 8px; }
-        .edit-icon { cursor: pointer; font-size: 1.2rem; padding: 4px 8px; background: #e2e8f0; border-radius: 40px; }
-        /* --- Formularios --- */
+        .edit-icon { cursor: pointer; font-size: 1.2rem; padding: 4px 8px; background: #e2e8f0; border-radius: 40px; display: inline-block; }
         .form-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -127,7 +115,6 @@
             font-size: 0.9rem;
         }
         label { font-weight: 500; display: block; margin-bottom: 4px; }
-        /* --- Escáner --- */
         #scannerModal {
             display: none;
             position: fixed;
@@ -141,12 +128,10 @@
         }
         #qr-reader { width: 100%; margin-top: 60px; }
         .flex { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-        .hidden { display: none; }
     </style>
 </head>
 <body>
 <div class="container">
-    <!-- Barra Superior con Año Académico -->
     <div class="top-bar">
         <h1 style="margin:0">📚 Banco de Libros</h1>
         <div class="year-selector">
@@ -156,361 +141,344 @@
         </div>
     </div>
 
-    <!-- Navegación Principal -->
     <div class="nav-tabs">
         <button class="nav-tab active" data-tab="alumnos">👨‍🎓 ALUMNOS</button>
         <button class="nav-tab" data-tab="socios">💰 SOCIOS AMPA</button>
         <button class="nav-tab" data-tab="biblioteca">📖 BIBLIOTECA</button>
         <button class="nav-tab" data-tab="informes">📊 INFORMES</button>
-        <button class="nav-tab" data-tab="prestamos">🔄 PRÉSTAMOS (Rápido)</button>
+        <button class="nav-tab" data-tab="prestamos">🔄 PRÉSTAMOS</button>
     </div>
 
-    <!-- Contenido Dinámico -->
     <div id="mainPanel"></div>
 </div>
 
-<!-- Modal Escáner -->
 <div id="scannerModal">
     <button id="btnCerrarScanner" style="background:white; color:black; width:auto;">✖ Cerrar</button>
     <div id="qr-reader"></div>
 </div>
 
 <script>
-// ==================== CONFIGURACIÓN SUPABASE ====================
-const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Variables Globales
-let html5QrCode = null;
-let currentTab = 'alumnos';
-let currentAnoId = null;
-let currentEditingAlumnoId = null;
-
-// ==================== INICIALIZACIÓN ====================
-async function init() {
-    await cargarAnosAcademicos();
-    setupEventListeners();
-    cargarTab(currentTab);
-}
-// Cargar años académicos y selector
-async function cargarAnosAcademicos() {
-    const { data: anos } = await supabase.from('ano_academico').select('*').order('id', { ascending: false });
-    const select = document.getElementById('selectAnoAcademico');
-    select.innerHTML = '<option value="">Seleccionar año</option>';
-    anos.forEach(ano => {
-        const option = document.createElement('option');
-        option.value = ano.id;
-        option.textContent = `${ano.nombre} ${ano.activo ? '(Activo)' : ''}`;
-        if (ano.activo) {
-            option.selected = true;
-            currentAnoId = ano.id;
-            document.getElementById('anoActivoBadge').style.display = 'inline-block';
-        }
-        select.appendChild(option);
-    });
-    select.addEventListener('change', (e) => {
-        currentAnoId = parseInt(e.target.value);
-        if (currentTab) cargarTab(currentTab);
-    });
-}
-function setupEventListeners() {
-    document.querySelectorAll('.nav-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-            document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            currentTab = btn.dataset.tab;
-            cargarTab(currentTab);
-        });
-    });
-    document.getElementById('btnCerrarScanner').addEventListener('click', cerrarScanner);
-}
-// ==================== CARGA DE PESTAÑAS ====================
-async function cargarTab(tab) {
-    const panel = document.getElementById('mainPanel');
-    if (!currentAnoId) { panel.innerHTML = '<div class="card">⚠️ Selecciona un año académico primero.</div>'; return; }
-    switch(tab) {
-        case 'alumnos': await cargarAlumnos(); break;
-        case 'socios': await cargarSocios(); break;
-        case 'biblioteca': await cargarBiblioteca(); break;
-        case 'informes': await cargarInformes(); break;
-        case 'prestamos': await cargarPrestamosRapido(); break;
-        default: panel.innerHTML = '<div class="card">Sección en construcción</div>';
+(function() {
+    // ==================== CONFIGURACIÓN ====================
+    const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
+    
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    
+    let html5QrCode = null;
+    let currentTab = 'alumnos';
+    let currentAnoId = null;
+    let currentEditingAlumnoId = null;
+    let modoActual = "";
+    
+    // ==================== INICIALIZACIÓN ====================
+    async function init() {
+        await cargarAnosAcademicos();
+        setupEventListeners();
+        cargarTab(currentTab);
     }
-}
-// ==================== ALUMNOS ====================
-async function cargarAlumnos() {
-    // Obtener alumnos con historial del año seleccionado
-    const { data: historial, error } = await supabase
-        .from('historial_alumnos')
-        .select('*, alumnos(*)')
-        .eq('ano_academico_id', currentAnoId);
-    if (error) { console.error(error); mostrarPanelError(); return; }
-    let html = `<div class="card"><div class="flex"><h2>👨‍🎓 Listado de Alumnos</h2><button id="btnNuevoAlumno">➕ Nuevo Alumno</button></div>
-        <div class="flex"><input type="text" id="buscarAlumnoInput" placeholder="Buscar por nombre..."></div><div id="listaAlumnos"></div></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('btnNuevoAlumno').onclick = () => mostrarFormularioAlumno(null);
-    document.getElementById('buscarAlumnoInput').oninput = () => filtrarAlumnos(historial);
-    window.historialAlumnosGlobal = historial;
-    filtrarAlumnos(historial);
-}
-function filtrarAlumnos(historial) {
-    const search = document.getElementById('buscarAlumnoInput')?.value.toLowerCase() || '';
-    const filtered = historial.filter(h => h.alumnos.nombre.toLowerCase().includes(search) || h.alumnos.apellidos.toLowerCase().includes(search));
-    const container = document.getElementById('listaAlumnos');
-    if (!container) return;
-    if (filtered.length === 0) { container.innerHTML = '<p>No hay alumnos</p>'; return; }
-    let html = '';
-    filtered.forEach(h => {
-        html += `<div class="alumno-row">
-            <div class="alumno-info"><strong>${h.alumnos.nombre} ${h.alumnos.apellidos}</strong><br>
-            ${h.curso} ${h.grupo} | Beca: ${h.beca ? 'Sí' : 'No'} | Socio: ${h.socio_ampa ? 'Sí' : 'No'}<br>
-            📚 Préstamos activos: ${h.libros_prestados || 0}
-            </div>
-            <div class="alumno-actions"><span class="edit-icon" onclick="editarAlumno(${h.alumnos.id})">✏️</span>
-            <span class="edit-icon" onclick="darBajaAlumno(${h.alumnos.id})">🗑️</span></div>
+    
+    async function cargarAnosAcademicos() {
+        const { data: anos } = await supabase.from('ano_academico').select('*').order('id', { ascending: false });
+        const select = document.getElementById('selectAnoAcademico');
+        if(!anos || anos.length === 0) {
+            select.innerHTML = '<option>Crear años académicos en SQL</option>';
+            return;
+        }
+        select.innerHTML = '';
+        anos.forEach(ano => {
+            const option = document.createElement('option');
+            option.value = ano.id;
+            option.textContent = `${ano.nombre} ${ano.activo ? '(Activo)' : ''}`;
+            if (ano.activo) {
+                option.selected = true;
+                currentAnoId = ano.id;
+            }
+            select.appendChild(option);
+        });
+        select.addEventListener('change', (e) => {
+            currentAnoId = parseInt(e.target.value);
+            if (currentTab) cargarTab(currentTab);
+        });
+    }
+    
+    function setupEventListeners() {
+        document.querySelectorAll('.nav-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentTab = btn.dataset.tab;
+                cargarTab(currentTab);
+            });
+        });
+        document.getElementById('btnCerrarScanner').addEventListener('click', cerrarScanner);
+    }
+    
+    async function cargarTab(tab) {
+        const panel = document.getElementById('mainPanel');
+        if (!currentAnoId) { 
+            panel.innerHTML = '<div class="card">⚠️ Selecciona o crea un año académico en la base de datos.</div>'; 
+            return;
+        }
+        if(tab === 'alumnos') await cargarAlumnos();
+        else if(tab === 'socios') await cargarSocios();
+        else if(tab === 'biblioteca') await cargarBiblioteca();
+        else if(tab === 'informes') await cargarInformes();
+        else if(tab === 'prestamos') await cargarPrestamosRapido();
+    }
+    
+    // ==================== ALUMNOS ====================
+    async function cargarAlumnos() {
+        const { data: historial } = await supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', currentAnoId);
+        
+        let html = `<div class="card">
+            <div class="flex"><h2>👨‍🎓 Listado de Alumnos</h2><button id="btnNuevoAlumno">➕ Nuevo Alumno</button></div>
+            <div class="flex"><input type="text" id="buscarAlumnoInput" placeholder="Buscar por nombre..."></div>
+            <div id="listaAlumnos"></div>
         </div>`;
-    });
-    container.innerHTML = html;
-}
-window.editarAlumno = async (alumnoId) => {
-    currentEditingAlumnoId = alumnoId;
-    // Obtener datos del alumno permanente
-    const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
-    // Obtener historial del año actual
-    const { data: historialActual } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).maybeSingle();
-    // Obtener libros prestados actualmente
-    const { data: prestamos } = await supabase.from('prestamos').select('*, libros(*)').eq('alumno_id', alumnoId).eq('entregado', false);
-    // Mostrar formulario de edición
-    mostrarFormularioAlumno({ alumno, historialActual, prestamos });
-};
-window.darBajaAlumno = async (alumnoId) => {
-    if(!confirm('¿Dar de baja a este alumno? Se conservará el historial.')) return;
-    const motivo = prompt('Motivo de la baja:');
-    if(motivo) {
-        await supabase.from('bajas_alumnos').insert({ alumno_id: alumnoId, motivo: motivo });
-        await supabase.from('historial_alumnos').update({ activo: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
-        alert('Alumno dado de baja');
-        cargarAlumnos();
+        document.getElementById('mainPanel').innerHTML = html;
+        document.getElementById('btnNuevoAlumno').onclick = () => mostrarFormularioAlumno(null);
+        document.getElementById('buscarAlumnoInput').oninput = () => filtrarAlumnos(historial || []);
+        window.historialAlumnosGlobal = historial || [];
+        filtrarAlumnos(historial || []);
     }
-};
-async function mostrarFormularioAlumno(data) {
-    const isNew = !data || !data.alumno;
-    const alumno = data?.alumno || {};
-    const historial = data?.historialActual || {};
-    const prestamos = data?.prestamos || [];
-    let html = `<div class="card"><h2>${isNew ? '➕ Nuevo Alumno' : `✏️ Editando: ${alumno.nombre} ${alumno.apellidos}`}</h2>
-    <div class="form-grid">
-        <div><label>Nombre</label><input id="editNombre" value="${alumno.nombre || ''}"></div>
-        <div><label>Apellidos</label><input id="editApellidos" value="${alumno.apellidos || ''}"></div>
-        <div><label>Curso</label><select id="editCurso"><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
-        <div><label>Grupo</label><input id="editGrupo" value="${historial.grupo || ''}"></div>
-        <div><label>Teléfono</label><input id="editTelefono" value="${historial.telefono || ''}"></div>
-        <div><label><input type="checkbox" id="editBilingue" ${historial.bilingue ? 'checked' : ''}> Bilingüe</label></div>
-        <div><label><input type="checkbox" id="editBeca" ${historial.beca ? 'checked' : ''}> Beca</label></div>
-        <div><label><input type="checkbox" id="editSocio" ${historial.socio_ampa ? 'checked' : ''}> Socio AMPA</label></div>
-        <div><label><input type="checkbox" id="editDonante" ${historial.donante ? 'checked' : ''}> Donante</label></div>
-        <div><label>Observaciones</label><textarea id="editObservaciones">${historial.observaciones || ''}</textarea></div>
-    </div>
-    <h3>📚 Libros Prestados</h3><div id="prestamosLista">${prestamos.map(p => `<div>📖 ${p.libros.titulo} <button onclick="devolverLibroRapido(${p.id})">Devolver</button></div>`).join('')}</div>
-    <div class="flex"><button id="guardarAlumnoBtn">💾 Guardar</button><button class="secondary" onclick="cargarAlumnos()">Cancelar</button></div></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('editCurso').value = historial.curso || '1ESO';
-    document.getElementById('guardarAlumnoBtn').onclick = async () => {
-        // Guardar o actualizar alumno permanente
-        let alumnoId = alumno.id;
-        if (isNew) {
-            const { data: nuevo } = await supabase.from('alumnos').insert({ nombre: document.getElementById('editNombre').value, apellidos: document.getElementById('editApellidos').value }).select().single();
-            alumnoId = nuevo.id;
-        } else {
-            await supabase.from('alumnos').update({ nombre: document.getElementById('editNombre').value, apellidos: document.getElementById('editApellidos').value }).eq('id', alumnoId);
-        }
-        // Guardar historial del año actual
-        const historialData = {
-            alumno_id: alumnoId,
-            ano_academico_id: currentAnoId,
-            curso: document.getElementById('editCurso').value,
-            grupo: document.getElementById('editGrupo').value,
-            telefono: document.getElementById('editTelefono').value,
-            bilingue: document.getElementById('editBilingue').checked,
-            beca: document.getElementById('editBeca').checked,
-            socio_ampa: document.getElementById('editSocio').checked,
-            donante: document.getElementById('editDonante').checked,
-            observaciones: document.getElementById('editObservaciones').value,
-            activo: true
-        };
-        if (historial.id) await supabase.from('historial_alumnos').update(historialData).eq('id', historial.id);
-        else await supabase.from('historial_alumnos').insert(historialData);
-        alert('Alumno guardado correctamente');
-        cargarAlumnos();
-    };
-}
-window.devolverLibroRapido = async (prestamoId) => {
-    await supabase.from('prestamos').update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq('id', prestamoId);
-    alert('Libro devuelto');
-    editarAlumno(currentEditingAlumnoId);
-};
-// ==================== SOCIOS ====================
-async function cargarSocios() {
-    const { data: socios } = await supabase.from('socios').select('*, alumnos(*), ano_academico(*)').eq('ano_academico_id', currentAnoId);
-    let html = `<div class="card"><h2>💰 Socios AMPA ${currentAnoId ? '' : ''}</h2><button id="btnRegistrarPago">➕ Registrar Pago</button><div id="listaSocios"></div></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('btnRegistrarPago').onclick = () => registrarPagoSocio();
-    const container = document.getElementById('listaSocios');
-    if (!socios?.length) { container.innerHTML = '<p>No hay socios registrados este año</p>'; return; }
-    let listHtml = '';
-    socios.forEach(s => {
-        listHtml += `<div class="alumno-row"><div><strong>${s.alumnos.nombre} ${s.alumnos.apellidos}</strong><br>Nº Socio: ${s.n_socio} | Pagado: ${s.fecha_pago}</div></div>`;
-    });
-    container.innerHTML = listHtml;
-}
-async function registrarPagoSocio() {
-    const { data: alumnos } = await supabase.from('alumnos').select('*');
-    let options = alumnos.map(a => `<option value="${a.id}">${a.nombre} ${a.apellidos}</option>`).join('');
-    let html = `<div class="card"><h2>💰 Registrar Pago AMPA</h2>
-    <div class="form-grid"><div><label>Alumno</label><select id="socioAlumnoId">${options}</select></div>
-    <div><label>Fecha Pago</label><input type="date" id="socioFechaPago" value="${new Date().toISOString().slice(0,10)}"></div></div>
-    <div class="flex"><button id="confirmarPagoBtn">✅ Guardar</button><button class="secondary" onclick="cargarSocios()">Cancelar</button></div></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('confirmarPagoBtn').onclick = async () => {
-        const alumnoId = parseInt(document.getElementById('socioAlumnoId').value);
-        const fecha = document.getElementById('socioFechaPago').value;
-        // Obtener último número de socio
-        const { data: ultimo } = await supabase.from('socios').select('n_socio').order('n_socio', { ascending: false }).limit(1);
-        let nuevoNumero = ultimo?.length ? ultimo[0].n_socio + 1 : 1;
-        const { error } = await supabase.from('socios').insert({ n_socio: nuevoNumero, alumno_id: alumnoId, ano_academico_id: currentAnoId, fecha_pago: fecha });
-        if(error) { alert('Error: ' + error.message); return; }
-        // Marcar como socio en historial_alumnos
-        await supabase.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
-        alert(`Socio registrado con Nº ${nuevoNumero}`);
-        cargarSocios();
-    };
-}
-// ==================== BIBLIOTECA (Escáner ISBN y Signatura) ====================
-async function cargarBiblioteca() {
-    const { data: libros } = await supabase.from('libros').select('*').order('created_at', { ascending: false });
-    let html = `<div class="card"><h2>📖 Biblioteca / Banco de Libros</h2>
-    <div class="flex"><button id="btnNuevoLibro">➕ Nuevo Libro</button><button id="btnEscanearISBN">📷 Escanear ISBN (Auto-llenar)</button></div>
-    <div id="listaBiblioteca"></div></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('btnNuevoLibro').onclick = () => mostrarFormularioLibro(null);
-    document.getElementById('btnEscanearISBN').onclick = () => abrirScannerISBN();
-    const container = document.getElementById('listaBiblioteca');
-    if (!libros?.length) { container.innerHTML = '<p>No hay libros registrados</p>'; return; }
-    let listHtml = '';
-    libros.forEach(l => {
-        listHtml += `<div class="alumno-row"><div><strong>${l.titulo}</strong><br>Signatura: ${l.signatura || 'Sin signatura'} | Estado: ${l.estado || 'Nuevo'}</div>
-        <div><button onclick="editarLibro(${l.id})">✏️</button> <button onclick="darBajaLibro(${l.id})">🗑️</button></div></div>`;
-    });
-    container.innerHTML = listHtml;
-}
-async function abrirScannerISBN() {
-    // Lógica para escanear ISBN y rellenar automáticamente
-    alert('Modo escáner ISBN: Escanea el código del libro');
-    // Reutilizar el escáner existente
-    modoActual = "isbn";
-    abrirScanner("isbn");
-}
-window.editarLibro = async (libroId) => {
-    const { data: libro } = await supabase.from('libros').select('*').eq('id', libroId).single();
-    let html = `<div class="card"><h2>✏️ Editar Libro</h2><div class="form-grid">
-    <div><label>Título</label><input id="editTitulo" value="${libro.titulo}"></div>
-    <div><label>Materia</label><input id="editMateria" value="${libro.materia || ''}"></div>
-    <div><label>Editorial</label><input id="editEditorial" value="${libro.editorial || ''}"></div>
-    <div><label>ISBN</label><input id="editIsbn" value="${libro.isbn || ''}"></div>
-    <div><label>Curso</label><input id="editCursoLibro" value="${libro.curso_para || ''}"></div>
-    <div><label>Signatura</label><input id="editSignatura" value="${libro.signatura || ''}"></div>
-    <div><label>Estado</label><select id="editEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
-    </div><div class="flex"><button id="guardarLibroBtn">💾 Guardar</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('editEstado').value = libro.estado || 'nuevo';
-    document.getElementById('guardarLibroBtn').onclick = async () => {
-        await supabase.from('libros').update({
-            titulo: document.getElementById('editTitulo').value,
-            materia: document.getElementById('editMateria').value,
-            editorial: document.getElementById('editEditorial').value,
-            isbn: document.getElementById('editIsbn').value,
-            curso_para: document.getElementById('editCursoLibro').value,
-            signatura: document.getElementById('editSignatura').value,
-            estado: document.getElementById('editEstado').value
-        }).eq('id', libroId);
-        alert('Libro actualizado');
-        cargarBiblioteca();
-    };
-};
-async function mostrarFormularioLibro(libro) {
-    let html = `<div class="card"><h2>📖 Nuevo Libro</h2><div class="form-grid">
-    <div><label>Título</label><input id="nuevoTitulo"></div>
-    <div><label>Materia</label><input id="nuevaMateria"></div>
-    <div><label>Editorial</label><input id="nuevaEditorial"></div>
-    <div><label>ISBN</label><input id="nuevoIsbn"></div>
-    <div><label>Curso</label><input id="nuevoCurso"></div>
-    <div><label>Signatura (Opcional)</label><input id="nuevaSignatura"></div>
-    <div><label>Estado</label><select id="nuevoEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
-    </div><div class="flex"><button id="crearLibroBtn">💾 Crear</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('crearLibroBtn').onclick = async () => {
-        const { error } = await supabase.from('libros').insert({
-            codigo_barras: Date.now().toString(),
-            titulo: document.getElementById('nuevoTitulo').value,
-            materia: document.getElementById('nuevaMateria').value,
-            editorial: document.getElementById('nuevaEditorial').value,
-            isbn: document.getElementById('nuevoIsbn').value,
-            curso_para: document.getElementById('nuevoCurso').value,
-            signatura: document.getElementById('nuevaSignatura').value,
-            estado: document.getElementById('nuevoEstado').value
+    
+    function filtrarAlumnos(historial) {
+        const search = document.getElementById('buscarAlumnoInput')?.value.toLowerCase() || '';
+        const filtered = historial.filter(h => h.alumnos && (h.alumnos.nombre?.toLowerCase().includes(search) || h.alumnos.apellidos?.toLowerCase().includes(search)));
+        const container = document.getElementById('listaAlumnos');
+        if (!container) return;
+        if (filtered.length === 0) { container.innerHTML = '<p>No hay alumnos</p>'; return; }
+        let html = '';
+        filtered.forEach(h => {
+            html += `<div class="alumno-row">
+                <div class="alumno-info">
+                    <strong>${h.alumnos.nombre} ${h.alumnos.apellidos}</strong><br>
+                    ${h.curso || ''} ${h.grupo || ''} | Beca: ${h.beca ? 'Sí' : 'No'} | Socio: ${h.socio_ampa ? 'Sí' : 'No'}
+                </div>
+                <div class="alumno-actions">
+                    <span class="edit-icon" onclick="window.editarAlumno(${h.alumnos.id})">✏️</span>
+                    <span class="edit-icon" onclick="window.darBajaAlumno(${h.alumnos.id})">🗑️</span>
+                </div>
+            </div>`;
         });
-        if(error) alert('Error: '+error.message);
-        else alert('Libro creado');
-        cargarBiblioteca();
+        container.innerHTML = html;
+    }
+    
+    window.editarAlumno = async (alumnoId) => {
+        currentEditingAlumnoId = alumnoId;
+        const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
+        const { data: historialActual } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).maybeSingle();
+        const { data: prestamos } = await supabase.from('prestamos').select('*, libros(*)').eq('alumno_id', alumnoId).eq('entregado', false);
+        
+        let html = `<div class="card">
+            <h2>✏️ Editando: ${alumno.nombre} ${alumno.apellidos}</h2>
+            <div class="form-grid">
+                <div><label>Nombre</label><input id="editNombre" value="${alumno.nombre || ''}"></div>
+                <div><label>Apellidos</label><input id="editApellidos" value="${alumno.apellidos || ''}"></div>
+                <div><label>Curso</label><select id="editCurso"><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
+                <div><label>Grupo</label><input id="editGrupo" value="${historialActual?.grupo || ''}"></div>
+                <div><label>Teléfono</label><input id="editTelefono" value="${historialActual?.telefono || ''}"></div>
+                <div><label><input type="checkbox" id="editBilingue" ${historialActual?.bilingue ? 'checked' : ''}> Bilingüe</label></div>
+                <div><label><input type="checkbox" id="editBeca" ${historialActual?.beca ? 'checked' : ''}> Beca</label></div>
+                <div><label><input type="checkbox" id="editSocio" ${historialActual?.socio_ampa ? 'checked' : ''}> Socio AMPA</label></div>
+                <div><label><input type="checkbox" id="editDonante" ${historialActual?.donante ? 'checked' : ''}> Donante</label></div>
+                <div><label>Observaciones</label><textarea id="editObservaciones">${historialActual?.observaciones || ''}</textarea></div>
+            </div>
+            <h3>📚 Libros Prestados</h3>
+            <div id="prestamosLista">${prestamos?.map(p => `<div>📖 ${p.libros?.titulo} <button onclick="window.devolverLibroRapido(${p.id})">Devolver</button></div>`).join('') || '<p>Sin préstamos activos</p>'}</div>
+            <div class="flex"><button id="guardarAlumnoBtn">💾 Guardar</button><button class="secondary" onclick="cargarAlumnos()">Cancelar</button></div>
+        </div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+        if(document.getElementById('editCurso')) document.getElementById('editCurso').value = historialActual?.curso || '1ESO';
+        document.getElementById('guardarAlumnoBtn').onclick = async () => {
+            await supabase.from('alumnos').update({ 
+                nombre: document.getElementById('editNombre').value, 
+                apellidos: document.getElementById('editApellidos').value 
+            }).eq('id', alumnoId);
+            
+            const historialData = {
+                alumno_id: alumnoId,
+                ano_academico_id: currentAnoId,
+                curso: document.getElementById('editCurso').value,
+                grupo: document.getElementById('editGrupo').value,
+                telefono: document.getElementById('editTelefono').value,
+                bilingue: document.getElementById('editBilingue').checked,
+                beca: document.getElementById('editBeca').checked,
+                socio_ampa: document.getElementById('editSocio').checked,
+                donante: document.getElementById('editDonante').checked,
+                observaciones: document.getElementById('editObservaciones').value,
+                activo: true
+            };
+            if (historialActual?.id) await supabase.from('historial_alumnos').update(historialData).eq('id', historialActual.id);
+            else await supabase.from('historial_alumnos').insert(historialData);
+            alert('Alumno guardado');
+            cargarAlumnos();
+        };
     };
-}
-// ==================== PRÉSTAMOS RÁPIDO (Escáner) ====================
-async function cargarPrestamosRapido() {
-    let html = `<div class="card"><h2>🔄 Préstamos Rápidos</h2>
-    <div class="flex"><button id="btnEscanearPrestamo">📷 Escanear Código (Alumno/Libro)</button></div>
-    <div id="resultadoEscaneo"></div></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('btnEscanearPrestamo').onclick = () => { modoActual = "prestamo_rapido"; abrirScanner("prestamo_rapido"); };
-}
-// ==================== ESCÁNER GLOBAL ====================
-function abrirScanner(modo) {
-    modoActual = modo;
-    document.getElementById("scannerModal").style.display = "block";
-    if (html5QrCode === null) html5QrCode = new Html5Qrcode("qr-reader");
-    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (texto) => {
-        html5QrCode.stop();
-        cerrarScanner();
-        procesarEscaneoGlobal(texto);
-    }, () => {}).catch(err => alert("Error cámara: " + err));
-}
-function cerrarScanner() {
-    if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop();
-    document.getElementById("scannerModal").style.display = "none";
-}
-async function procesarEscaneoGlobal(codigo) {
-    if (modoActual === "prestamo_rapido") {
-        // Buscar si es código de alumno (buscando en alumnos por código)
-        let { data: alumno } = await supabase.from('alumnos').select('*').eq('codigo_barras', codigo).maybeSingle();
-        if(alumno) {
-            editarAlumno(alumno.id);
-            alert(`Alumno encontrado: ${alumno.nombre}`);
-        } else {
-            // Es un libro
-            let { data: libro } = await supabase.from('libros').select('*').eq('codigo_barras', codigo).maybeSingle();
-            if(libro) alert(`Libro escaneado: ${libro.titulo}. Usa la sección ALUMNOS para prestarlo.`);
-            else alert('Código no reconocido');
+    
+    window.devolverLibroRapido = async (prestamoId) => {
+        await supabase.from('prestamos').update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq('id', prestamoId);
+        alert('Libro devuelto');
+        if(currentEditingAlumnoId) window.editarAlumno(currentEditingAlumnoId);
+        else cargarAlumnos();
+    };
+    
+    window.darBajaAlumno = async (alumnoId) => {
+        if(!confirm('¿Dar de baja a este alumno?')) return;
+        const motivo = prompt('Motivo:');
+        if(motivo) {
+            await supabase.from('bajas_alumnos').insert({ alumno_id: alumnoId, motivo: motivo });
+            await supabase.from('historial_alumnos').update({ activo: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+            alert('Alumno dado de baja');
+            cargarAlumnos();
+        }
+    };
+    
+    // ==================== SOCIOS ====================
+    async function cargarSocios() {
+        const { data: socios } = await supabase.from('socios').select('*, alumnos(*)').eq('ano_academico_id', currentAnoId);
+        let html = `<div class="card"><h2>💰 Socios AMPA</h2><button id="btnRegistrarPago">➕ Registrar Pago</button><div id="listaSocios"></div></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+        document.getElementById('btnRegistrarPago').onclick = () => registrarPagoSocio();
+        const container = document.getElementById('listaSocios');
+        if (!socios?.length) { container.innerHTML = '<p>No hay socios este año</p>'; return; }
+        let listHtml = '';
+        socios.forEach(s => {
+            listHtml += `<div class="alumno-row"><div><strong>${s.alumnos?.nombre} ${s.alumnos?.apellidos}</strong><br>Nº Socio: ${s.n_socio} | Pagado: ${s.fecha_pago}</div></div>`;
+        });
+        container.innerHTML = listHtml;
+    }
+    
+    async function registrarPagoSocio() {
+        const { data: alumnos } = await supabase.from('alumnos').select('*');
+        let options = alumnos.map(a => `<option value="${a.id}">${a.nombre} ${a.apellidos}</option>`).join('');
+        let html = `<div class="card"><h2>Registrar Pago AMPA</h2>
+        <div class="form-grid"><div><label>Alumno</label><select id="socioAlumnoId">${options}</select></div>
+        <div><label>Fecha Pago</label><input type="date" id="socioFechaPago" value="${new Date().toISOString().slice(0,10)}"></div></div>
+        <div class="flex"><button id="confirmarPagoBtn">Guardar</button><button class="secondary" onclick="cargarSocios()">Cancelar</button></div></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+        document.getElementById('confirmarPagoBtn').onclick = async () => {
+            const alumnoId = parseInt(document.getElementById('socioAlumnoId').value);
+            const fecha = document.getElementById('socioFechaPago').value;
+            const { data: ultimo } = await supabase.from('socios').select('n_socio').order('n_socio', { ascending: false }).limit(1);
+            let nuevoNumero = ultimo?.length ? ultimo[0].n_socio + 1 : 1;
+            await supabase.from('socios').insert({ n_socio: nuevoNumero, alumno_id: alumnoId, ano_academico_id: currentAnoId, fecha_pago: fecha });
+            await supabase.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+            alert(`Socio Nº ${nuevoNumero}`);
+            cargarSocios();
+        };
+    }
+    
+    // ==================== BIBLIOTECA ====================
+    async function cargarBiblioteca() {
+        const { data: libros } = await supabase.from('libros').select('*').order('created_at', { ascending: false });
+        let html = `<div class="card"><h2>📖 Biblioteca</h2><div class="flex"><button id="btnNuevoLibro">➕ Nuevo Libro</button></div><div id="listaBiblioteca"></div></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+        document.getElementById('btnNuevoLibro').onclick = () => mostrarFormularioLibro();
+        const container = document.getElementById('listaBiblioteca');
+        if (!libros?.length) { container.innerHTML = '<p>No hay libros</p>'; return; }
+        let listHtml = '';
+        libros.forEach(l => {
+            listHtml += `<div class="alumno-row"><div><strong>${l.titulo}</strong><br>Signatura: ${l.signatura || '-'} | Estado: ${l.estado || 'nuevo'}</div>
+            <div><button onclick="window.editarLibro(${l.id})">✏️</button></div></div>`;
+        });
+        container.innerHTML = listHtml;
+    }
+    
+    window.editarLibro = async (libroId) => {
+        const { data: libro } = await supabase.from('libros').select('*').eq('id', libroId).single();
+        let html = `<div class="card"><h2>Editar Libro</h2><div class="form-grid">
+        <div><label>Título</label><input id="editTitulo" value="${libro.titulo}"></div>
+        <div><label>Materia</label><input id="editMateria" value="${libro.materia || ''}"></div>
+        <div><label>Editorial</label><input id="editEditorial" value="${libro.editorial || ''}"></div>
+        <div><label>Signatura</label><input id="editSignatura" value="${libro.signatura || ''}"></div>
+        <div><label>Estado</label><select id="editEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+        </div><div class="flex"><button id="guardarLibroBtn">Guardar</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+        document.getElementById('editEstado').value = libro.estado || 'nuevo';
+        document.getElementById('guardarLibroBtn').onclick = async () => {
+            await supabase.from('libros').update({
+                titulo: document.getElementById('editTitulo').value,
+                materia: document.getElementById('editMateria').value,
+                editorial: document.getElementById('editEditorial').value,
+                signatura: document.getElementById('editSignatura').value,
+                estado: document.getElementById('editEstado').value
+            }).eq('id', libroId);
+            alert('Libro actualizado');
+            cargarBiblioteca();
+        };
+    };
+    
+    async function mostrarFormularioLibro() {
+        let html = `<div class="card"><h2>Nuevo Libro</h2><div class="form-grid">
+        <div><label>Título</label><input id="nuevoTitulo"></div>
+        <div><label>Materia</label><input id="nuevaMateria"></div>
+        <div><label>Editorial</label><input id="nuevaEditorial"></div>
+        <div><label>Signatura</label><input id="nuevaSignatura"></div>
+        <div><label>Estado</label><select id="nuevoEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+        </div><div class="flex"><button id="crearLibroBtn">Crear</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+        document.getElementById('crearLibroBtn').onclick = async () => {
+            await supabase.from('libros').insert({
+                codigo_barras: Date.now().toString(),
+                titulo: document.getElementById('nuevoTitulo').value,
+                materia: document.getElementById('nuevaMateria').value,
+                editorial: document.getElementById('nuevaEditorial').value,
+                signatura: document.getElementById('nuevaSignatura').value,
+                estado: document.getElementById('nuevoEstado').value
+            });
+            alert('Libro creado');
+            cargarBiblioteca();
+        };
+    }
+    
+    // ==================== PRÉSTAMOS RÁPIDO ====================
+    async function cargarPrestamosRapido() {
+        let html = `<div class="card"><h2>🔄 Préstamos Rápidos</h2><button id="btnEscanearPrestamo">📷 Escanear Código de Alumno</button><div id="resultadoEscaneo"></div></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+        document.getElementById('btnEscanearPrestamo').onclick = () => { modoActual = "prestamo_rapido"; abrirScanner(); };
+    }
+    
+    // ==================== ESCÁNER ====================
+    function abrirScanner() {
+        document.getElementById("scannerModal").style.display = "block";
+        if (html5QrCode === null) html5QrCode = new Html5Qrcode("qr-reader");
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (texto) => {
+            html5QrCode.stop();
+            cerrarScanner();
+            procesarEscaneo(texto);
+        }, () => {}).catch(err => alert("Error cámara: " + err));
+    }
+    
+    function cerrarScanner() {
+        if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop();
+        document.getElementById("scannerModal").style.display = "none";
+    }
+    
+    async function procesarEscaneo(codigo) {
+        if (modoActual === "prestamo_rapido") {
+            const { data: alumno } = await supabase.from('alumnos').select('*').eq('codigo_barras', codigo).maybeSingle();
+            if(alumno) {
+                window.editarAlumno(alumno.id);
+                alert(`Alumno: ${alumno.nombre}`);
+            } else {
+                alert('Código no reconocido');
+            }
         }
     }
-}
-// ==================== INFORMES (Placeholder) ====================
-async function cargarInformes() {
-    let html = `<div class="card"><h2>📊 Informes</h2><p>Aquí irán los informes exportables (Alumnos becados, libros prestados, etc.)</p><button id="btnExportarExcel">Exportar a Excel (Demo)</button></div>`;
-    document.getElementById('mainPanel').innerHTML = html;
-    document.getElementById('btnExportarExcel').onclick = () => alert('Funcionalidad en desarrollo: Exportará los datos actuales a CSV');
-}
-// ==================== LANZAR APP ====================
-init();
+    
+    // ==================== INFORMES ====================
+    async function cargarInformes() {
+        let html = `<div class="card"><h2>📊 Informes</h2><p>Próximamente: exportación a Excel, filtros avanzados, etc.</p></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+    }
+    
+    init();
+})();
 </script>
 </body>
 </html>
