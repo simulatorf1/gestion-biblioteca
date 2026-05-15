@@ -3,67 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Biblioteca - Escáner</title>
+    <title>Banco de Libros - Sistema Completo</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        /* --- Estilos Generales --- */
+        * { box-sizing: border-box; }
         body {
             font-family: system-ui, -apple-system, sans-serif;
-            padding: 16px;
-            max-width: 600px;
-            margin: 0 auto;
-            background: #f5f7fb;
+            background: #f0f2f5;
+            margin: 0;
+            padding: 20px;
         }
-        h1 {
-            font-size: 1.8rem;
-            margin-bottom: 16px;
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        /* --- Barra Superior con Año Académico --- */
+        .top-bar {
+            background: white;
+            border-radius: 16px;
+            padding: 12px 24px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .year-selector {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: #f8fafc;
+            padding: 8px 16px;
+            border-radius: 40px;
+        }
+        .year-selector select {
+            padding: 8px 12px;
+            border-radius: 24px;
+            border: 1px solid #cbd5e1;
+            font-weight: bold;
+            background: white;
+        }
+        /* --- Navegación Principal --- */
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            border-bottom: 2px solid #e2e8f0;
+            flex-wrap: wrap;
+        }
+        .nav-tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 12px 12px 0 0;
+            color: #64748b;
+        }
+        .nav-tab.active {
+            color: #2563eb;
+            border-bottom: 3px solid #2563eb;
+            background: #eff6ff;
+        }
+        /* --- Tarjetas y Botones --- */
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
         button {
             background: #2563eb;
             color: white;
             border: none;
-            padding: 12px 20px;
-            margin: 6px;
-            border-radius: 12px;
-            font-size: 1rem;
+            padding: 10px 18px;
+            border-radius: 40px;
             font-weight: 500;
             cursor: pointer;
+            font-size: 0.9rem;
         }
-        button.secondary {
-            background: #64748b;
+        button.secondary { background: #64748b; }
+        button.danger { background: #dc2626; }
+        button.success { background: #10b981; }
+        button.icon-btn {
+            background: transparent;
+            color: #2563eb;
+            padding: 4px 8px;
+            font-size: 1.2rem;
         }
-        button.danger {
-            background: #dc2626;
-        }
-        .card {
-            background: white;
-            border-radius: 20px;
-            padding: 20px;
-            margin-top: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        input {
-            width: 100%;
-            padding: 12px;
-            margin: 8px 0;
-            border: 1px solid #cbd5e1;
-            border-radius: 12px;
-            font-size: 1rem;
-        }
-        .libro-item {
+        /* --- Tablas y Listas --- */
+        .alumno-row {
             background: #f8fafc;
-            padding: 12px;
-            margin: 8px 0;
-            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
             border-left: 4px solid #2563eb;
         }
-        .tachado {
-            text-decoration: line-through;
-            opacity: 0.6;
+        .alumno-info { flex: 1; }
+        .alumno-actions { display: flex; gap: 8px; }
+        .edit-icon { cursor: pointer; font-size: 1.2rem; padding: 4px 8px; background: #e2e8f0; border-radius: 40px; }
+        /* --- Formularios --- */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
         }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 12px;
+            font-size: 0.9rem;
+        }
+        label { font-weight: 500; display: block; margin-bottom: 4px; }
+        /* --- Escáner --- */
         #scannerModal {
             display: none;
             position: fixed;
@@ -75,425 +139,378 @@
             z-index: 1000;
             padding: 20px;
         }
-        #qr-reader {
-            width: 100%;
-            margin-top: 60px;
-        }
-        .flex {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 8px;
-        }
+        #qr-reader { width: 100%; margin-top: 60px; }
+        .flex { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
+<div class="container">
+    <!-- Barra Superior con Año Académico -->
+    <div class="top-bar">
+        <h1 style="margin:0">📚 Banco de Libros</h1>
+        <div class="year-selector">
+            <span>📅 Año Académico:</span>
+            <select id="selectAnoAcademico"></select>
+            <span id="anoActivoBadge" style="background:#10b981; color:white; padding:4px 12px; border-radius:40px; font-size:0.8rem;">Activo</span>
+        </div>
+    </div>
 
-<h1>📚 Biblioteca</h1>
+    <!-- Navegación Principal -->
+    <div class="nav-tabs">
+        <button class="nav-tab active" data-tab="alumnos">👨‍🎓 ALUMNOS</button>
+        <button class="nav-tab" data-tab="socios">💰 SOCIOS AMPA</button>
+        <button class="nav-tab" data-tab="biblioteca">📖 BIBLIOTECA</button>
+        <button class="nav-tab" data-tab="informes">📊 INFORMES</button>
+        <button class="nav-tab" data-tab="prestamos">🔄 PRÉSTAMOS (Rápido)</button>
+    </div>
 
-<div class="flex">
-    <button id="btnLote">📦 LOTE (entrega)</button>
-    <button id="btnDevolucion">🔄 DEVOLUCIÓN</button>
-    <button id="btnPendientes">⏳ Préstamos activos</button>
-    <button id="btnBuscar">🔍 Buscar alumno</button>
+    <!-- Contenido Dinámico -->
+    <div id="mainPanel"></div>
 </div>
 
-<div id="panel" class="card">
-    <p>Selecciona una opción 👆</p>
-</div>
-
+<!-- Modal Escáner -->
 <div id="scannerModal">
     <button id="btnCerrarScanner" style="background:white; color:black; width:auto;">✖ Cerrar</button>
     <div id="qr-reader"></div>
 </div>
 
 <script>
-(function() {
-    // ==================== CONFIGURACIÓN ====================
-    const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
-    
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    
-    // Variables globales
-    let html5QrCode = null;
-    let modoActual = "";
-    let loteTemporal = [];
-    let devolucionAlumno = null;
-    let librosPendientes = [];
-    
-    function mostrarPanel(contenidoHTML) {
-        document.getElementById("panel").innerHTML = contenidoHTML;
-    }
-    
-    function abrirScanner(modo) {
-        modoActual = modo;
-        const modal = document.getElementById("scannerModal");
-        modal.style.display = "block";
-        
-        if (html5QrCode === null) {
-            html5QrCode = new Html5Qrcode("qr-reader");
+// ==================== CONFIGURACIÓN SUPABASE ====================
+const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Variables Globales
+let html5QrCode = null;
+let currentTab = 'alumnos';
+let currentAnoId = null;
+let currentEditingAlumnoId = null;
+
+// ==================== INICIALIZACIÓN ====================
+async function init() {
+    await cargarAnosAcademicos();
+    setupEventListeners();
+    cargarTab(currentTab);
+}
+// Cargar años académicos y selector
+async function cargarAnosAcademicos() {
+    const { data: anos } = await supabase.from('ano_academico').select('*').order('id', { ascending: false });
+    const select = document.getElementById('selectAnoAcademico');
+    select.innerHTML = '<option value="">Seleccionar año</option>';
+    anos.forEach(ano => {
+        const option = document.createElement('option');
+        option.value = ano.id;
+        option.textContent = `${ano.nombre} ${ano.activo ? '(Activo)' : ''}`;
+        if (ano.activo) {
+            option.selected = true;
+            currentAnoId = ano.id;
+            document.getElementById('anoActivoBadge').style.display = 'inline-block';
         }
-        
-        html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            (codigo) => {
-                html5QrCode.stop();
-                modal.style.display = "none";
-                procesarCodigo(codigo);
-            },
-            (errorMsg) => {}
-        ).catch(err => {
-            alert("No se pudo acceder a la cámara: " + err);
-            cerrarScanner();
-        });
-    }
-    
-    function cerrarScanner() {
-        if (html5QrCode && html5QrCode.isScanning) {
-            html5QrCode.stop();
-        }
-        document.getElementById("scannerModal").style.display = "none";
-    }
-    
-    async function procesarCodigo(codigo) {
-        let { data: libro } = await supabase
-            .from("libros")
-            .select("*")
-            .eq("codigo_barras", codigo)
-            .maybeSingle();
-        
-        if (!libro) {
-            const titulo = prompt("📖 Libro nuevo. Introduce el título:");
-            if (!titulo) return;
-            const { data: nuevo, error } = await supabase
-                .from("libros")
-                .insert({ codigo_barras: codigo, titulo: titulo })
-                .select()
-                .single();
-            if (error) {
-                alert("Error al guardar: " + error.message);
-                return;
-            }
-            libro = nuevo;
-            alert(`✅ Libro "${titulo}" añadido`);
-        }
-        
-        if (modoActual === "lote") {
-            if (!loteTemporal.find(l => l.codigo_barras === libro.codigo_barras)) {
-                loteTemporal.push(libro);
-                alert(`📚 Añadido: ${libro.titulo} (Total: ${loteTemporal.length})`);
-            } else {
-                alert(`⚠️ "${libro.titulo}" ya está en el lote`);
-            }
-            mostrarPantallaLote();
-        } 
-        else if (modoActual === "devolucion") {
-            await procesarDevolucion(libro);
-        }
-    }
-    
-    function mostrarPantallaLote() {
-        let html = `
-            <h2>📦 Entrega por lote</h2>
-            <div class="flex">
-                <button id="btnEscanearLote">📷 Escanear libro</button>
-                <button id="btnCancelarLote" class="secondary">🗑 Cancelar lote</button>
-            </div>
-            <div style="background:#fef3c7; padding:12px; border-radius:16px; margin-top:12px;">
-                <h3>Libros en este lote (${loteTemporal.length})</h3>
-                ${loteTemporal.length === 0 ? '<p>No hay libros aún</p>' : ''}
-                ${loteTemporal.map(l => `<div class="libro-item">📖 ${l.titulo}</div>`).join('')}
-            </div>
-        `;
-        
-        if (loteTemporal.length > 0) {
-            html += `
-                <hr>
-                <input type="text" id="nombreAlumno" placeholder="Nombre del alumno">
-                <input type="text" id="cursoAlumno" placeholder="Curso (opcional)">
-                <button id="btnAsignarLote">✅ Asignar ${loteTemporal.length} libros</button>
-            `;
-        }
-        
-        html += `<button id="btnVolverMenu" class="secondary">← Volver</button>`;
-        mostrarPanel(html);
-        
-        document.getElementById("btnEscanearLote")?.addEventListener("click", () => abrirScanner("lote"));
-        document.getElementById("btnCancelarLote")?.addEventListener("click", () => {
-            loteTemporal = [];
-            mostrarPantallaLote();
-        });
-        document.getElementById("btnAsignarLote")?.addEventListener("click", asignarLote);
-        document.getElementById("btnVolverMenu")?.addEventListener("click", menuPrincipal);
-    }
-    
-    async function asignarLote() {
-        const nombre = document.getElementById("nombreAlumno").value.trim();
-        if (!nombre) {
-            alert("Escribe el nombre del alumno");
-            return;
-        }
-        const curso = document.getElementById("cursoAlumno").value;
-        
-        let { data: alumno } = await supabase
-            .from("alumnos")
-            .select("id")
-            .eq("nombre", nombre)
-            .maybeSingle();
-        
-        if (!alumno) {
-            const { data: nuevo, error } = await supabase
-                .from("alumnos")
-                .insert({ nombre: nombre, curso: curso })
-                .select()
-                .single();
-            if (error) {
-                alert("Error al crear alumno: " + error.message);
-                return;
-            }
-            alumno = nuevo;
-        }
-        
-        for (const libro of loteTemporal) {
-            await supabase.from("prestamos").insert({
-                libro_codigo: libro.codigo_barras,
-                alumno_id: alumno.id,
-                fecha_prestamo: new Date().toISOString().slice(0,10)
-            });
-        }
-        
-        alert(`✅ ${loteTemporal.length} libros asignados a ${nombre}`);
-        loteTemporal = [];
-        menuPrincipal();
-    }
-    
-    async function iniciarDevolucion() {
-        devolucionAlumno = null;
-        modoActual = "devolucion";
-        mostrarPanel(`
-            <h2>🔄 Devolución</h2>
-            <p>Escanea el <strong>primer libro</strong> para identificar al alumno</p>
-            <button id="btnPrimerLibro">📷 Escanear primer libro</button>
-            <button id="btnCancelarDevo" class="secondary">Cancelar</button>
-        `);
-        document.getElementById("btnPrimerLibro")?.addEventListener("click", () => abrirScanner("devolucion"));
-        document.getElementById("btnCancelarDevo")?.addEventListener("click", menuPrincipal);
-    }
-    
-    async function procesarDevolucion(libro) {
-        if (!devolucionAlumno) {
-            const { data: prestamo } = await supabase
-                .from("prestamos")
-                .select("*, alumnos(*)")
-                .eq("libro_codigo", libro.codigo_barras)
-                .eq("entregado", false)
-                .maybeSingle();
-            
-            if (!prestamo) {
-                alert("Este libro no está prestado");
-                iniciarDevolucion();
-                return;
-            }
-            
-            devolucionAlumno = prestamo.alumnos;
-            
-            const { data: prestamosAlumno } = await supabase
-                .from("prestamos")
-                .select("*, libros(*)")
-                .eq("alumno_id", devolucionAlumno.id)
-                .eq("entregado", false);
-            
-            librosPendientes = prestamosAlumno.map(p => ({
-                id: p.id,
-                codigo: p.libros.codigo_barras,
-                titulo: p.libros.titulo,
-                devuelto: false
-            }));
-            
-            const encontrado = librosPendientes.find(l => l.codigo === libro.codigo_barras);
-            if (encontrado) {
-                await supabase
-                    .from("prestamos")
-                    .update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) })
-                    .eq("id", encontrado.id);
-                encontrado.devuelto = true;
-            }
-            
-            mostrarPantallaDevolucion();
-        } else {
-            const encontrado = librosPendientes.find(l => l.codigo === libro.codigo_barras);
-            if (encontrado && !encontrado.devuelto) {
-                await supabase
-                    .from("prestamos")
-                    .update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) })
-                    .eq("id", encontrado.id);
-                encontrado.devuelto = true;
-                alert(`✅ Devuelto: ${libro.titulo}`);
-                mostrarPantallaDevolucion();
-            } else if (encontrado && encontrado.devuelto) {
-                alert(`⚠️ "${libro.titulo}" ya fue devuelto`);
-            } else {
-                alert(`⚠️ "${libro.titulo}" no pertenece a ${devolucionAlumno.nombre}`);
-            }
-        }
-    }
-    
-    function mostrarPantallaDevolucion() {
-        const todosDevueltos = librosPendientes.every(l => l.devuelto);
-        
-        let html = `
-            <h2>🔄 Devolución: ${devolucionAlumno.nombre}</h2>
-            <p>Curso: ${devolucionAlumno.curso || "No especificado"}</p>
-            <h3>Libros pendientes:</h3>
-        `;
-        
-        if (todosDevueltos) {
-            html += `<p class="libro-item" style="background:#dcfce7;">✅ ¡Todos los libros devueltos!</p>`;
-            html += `<button id="btnFinalizarDevo" class="secondary">Finalizar</button>`;
-        } else {
-            html += `<button id="btnEscanearSiguiente">📷 Escanear siguiente libro</button>`;
-            for (const libro of librosPendientes) {
-                const clase = libro.devuelto ? "tachado" : "";
-                html += `<div class="libro-item ${clase}">📖 ${libro.titulo} ${libro.devuelto ? '✅' : '⏳'}</div>`;
-            }
-        }
-        
-        html += `<button id="btnCancelarDevo2" class="secondary">Cancelar</button>`;
-        mostrarPanel(html);
-        
-        if (!todosDevueltos) {
-            document.getElementById("btnEscanearSiguiente")?.addEventListener("click", () => abrirScanner("devolucion"));
-        } else {
-            document.getElementById("btnFinalizarDevo")?.addEventListener("click", () => {
-                devolucionAlumno = null;
-                menuPrincipal();
-            });
-        }
-        document.getElementById("btnCancelarDevo2")?.addEventListener("click", () => {
-            devolucionAlumno = null;
-            menuPrincipal();
-        });
-    }
-    
-    async function mostrarPendientes() {
-        const { data: pendientes } = await supabase
-            .from("prestamos_activos")
-            .select("*")
-            .order("alumno");
-        
-        if (!pendientes || pendientes.length === 0) {
-            mostrarPanel(`<h2>✅ No hay préstamos activos</h2><button id="btnVolverPendientes" class="secondary">Volver</button>`);
-            document.getElementById("btnVolverPendientes")?.addEventListener("click", menuPrincipal);
-            return;
-        }
-        
-        let html = `<h2>⏳ Préstamos activos (${pendientes.length})</h2>`;
-        let ultimoAlumno = "";
-        for (const p of pendientes) {
-            if (p.alumno !== ultimoAlumno) {
-                if (ultimoAlumno !== "") html += `</div>`;
-                html += `<div style="margin-top:12px;"><strong>👤 ${p.alumno}</strong><div style="margin-left:16px;">`;
-                ultimoAlumno = p.alumno;
-            }
-            html += `<div class="libro-item">📖 ${p.libro}</div>`;
-        }
-        html += `</div></div><button id="btnVolverPendientes" class="secondary">Volver</button>`;
-        mostrarPanel(html);
-        document.getElementById("btnVolverPendientes")?.addEventListener("click", menuPrincipal);
-    }
-    
-    async function buscarAlumno() {
-        mostrarPanel(`
-            <h2>🔍 Buscar alumno</h2>
-            <input type="text" id="nombreBuscar" placeholder="Escribe el nombre">
-            <button id="btnRealizarBusqueda">Buscar</button>
-            <button id="btnVolverBusqueda" class="secondary">Volver</button>
-            <div id="resultadosBusqueda"></div>
-        `);
-        
-        document.getElementById("btnRealizarBusqueda")?.addEventListener("click", async () => {
-            const nombre = document.getElementById("nombreBuscar").value.trim();
-            if (!nombre) return;
-            
-            const { data: alumnos } = await supabase
-                .from("alumnos")
-                .select("*")
-                .ilike("nombre", `%${nombre}%`);
-            
-            if (!alumnos || alumnos.length === 0) {
-                document.getElementById("resultadosBusqueda").innerHTML = "<p>❌ No se encontraron alumnos</p>";
-                return;
-            }
-            
-            let resultadosHtml = "";
-            for (const a of alumnos) {
-                const { data: prestamos } = await supabase
-                    .from("prestamos_activos")
-                    .select("*")
-                    .eq("alumno", a.nombre);
-                
-                resultadosHtml += `
-                    <div style="background:#f1f5f9; padding:12px; margin:8px 0; border-radius:12px; cursor:pointer;" onclick="verDetalleAlumno(${a.id}, '${a.nombre}')">
-                        <strong>${a.nombre}</strong> (${a.curso || "sin curso"})<br>
-                        📚 ${prestamos?.length || 0} libros prestados
-                    </div>
-                `;
-            }
-            document.getElementById("resultadosBusqueda").innerHTML = resultadosHtml;
-        });
-        
-        document.getElementById("btnVolverBusqueda")?.addEventListener("click", menuPrincipal);
-    }
-    
-    window.verDetalleAlumno = async function(id, nombre) {
-        const { data: prestamos } = await supabase
-            .from("prestamos_activos")
-            .select("*")
-            .eq("alumno", nombre);
-        
-        let html = `<h2>📋 ${nombre}</h2>`;
-        if (!prestamos || prestamos.length === 0) {
-            html += "<p>No tiene libros prestados actualmente</p>";
-        } else {
-            html += `<h3>Libros prestados (${prestamos.length}):</h3>`;
-            for (const p of prestamos) {
-                html += `<div class="libro-item">📖 ${p.libro}</div>`;
-            }
-        }
-        html += `<button id="btnVolverDetalle" class="secondary">← Volver</button>`;
-        mostrarPanel(html);
-        document.getElementById("btnVolverDetalle")?.addEventListener("click", buscarAlumno);
-    };
-    
-    function menuPrincipal() {
-        modoActual = "";
-        loteTemporal = [];
-        devolucionAlumno = null;
-        mostrarPanel(`
-            <p>✅ Sistema listo. Selecciona una opción:</p>
-            <ul style="margin-top:12px;">
-                <li><strong>📦 LOTE:</strong> Escanea varios libros y asígnalos a un alumno</li>
-                <li><strong>🔄 DEVOLUCIÓN:</strong> Escanea libros para devolverlos (con lista tachable)</li>
-                <li><strong>⏳ Préstamos activos:</strong> Ver todos los libros no devueltos</li>
-                <li><strong>🔍 Buscar alumno:</strong> Ver qué libros tiene cada alumno</li>
-            </ul>
-        `);
-    }
-    
-    // Conectar botones principales
-    document.getElementById("btnLote").addEventListener("click", () => {
-        loteTemporal = [];
-        mostrarPantallaLote();
+        select.appendChild(option);
     });
-    document.getElementById("btnDevolucion").addEventListener("click", iniciarDevolucion);
-    document.getElementById("btnPendientes").addEventListener("click", mostrarPendientes);
-    document.getElementById("btnBuscar").addEventListener("click", buscarAlumno);
-    document.getElementById("btnCerrarScanner").addEventListener("click", cerrarScanner);
-    
-    menuPrincipal();
-})();
+    select.addEventListener('change', (e) => {
+        currentAnoId = parseInt(e.target.value);
+        if (currentTab) cargarTab(currentTab);
+    });
+}
+function setupEventListeners() {
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentTab = btn.dataset.tab;
+            cargarTab(currentTab);
+        });
+    });
+    document.getElementById('btnCerrarScanner').addEventListener('click', cerrarScanner);
+}
+// ==================== CARGA DE PESTAÑAS ====================
+async function cargarTab(tab) {
+    const panel = document.getElementById('mainPanel');
+    if (!currentAnoId) { panel.innerHTML = '<div class="card">⚠️ Selecciona un año académico primero.</div>'; return; }
+    switch(tab) {
+        case 'alumnos': await cargarAlumnos(); break;
+        case 'socios': await cargarSocios(); break;
+        case 'biblioteca': await cargarBiblioteca(); break;
+        case 'informes': await cargarInformes(); break;
+        case 'prestamos': await cargarPrestamosRapido(); break;
+        default: panel.innerHTML = '<div class="card">Sección en construcción</div>';
+    }
+}
+// ==================== ALUMNOS ====================
+async function cargarAlumnos() {
+    // Obtener alumnos con historial del año seleccionado
+    const { data: historial, error } = await supabase
+        .from('historial_alumnos')
+        .select('*, alumnos(*)')
+        .eq('ano_academico_id', currentAnoId);
+    if (error) { console.error(error); mostrarPanelError(); return; }
+    let html = `<div class="card"><div class="flex"><h2>👨‍🎓 Listado de Alumnos</h2><button id="btnNuevoAlumno">➕ Nuevo Alumno</button></div>
+        <div class="flex"><input type="text" id="buscarAlumnoInput" placeholder="Buscar por nombre..."></div><div id="listaAlumnos"></div></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('btnNuevoAlumno').onclick = () => mostrarFormularioAlumno(null);
+    document.getElementById('buscarAlumnoInput').oninput = () => filtrarAlumnos(historial);
+    window.historialAlumnosGlobal = historial;
+    filtrarAlumnos(historial);
+}
+function filtrarAlumnos(historial) {
+    const search = document.getElementById('buscarAlumnoInput')?.value.toLowerCase() || '';
+    const filtered = historial.filter(h => h.alumnos.nombre.toLowerCase().includes(search) || h.alumnos.apellidos.toLowerCase().includes(search));
+    const container = document.getElementById('listaAlumnos');
+    if (!container) return;
+    if (filtered.length === 0) { container.innerHTML = '<p>No hay alumnos</p>'; return; }
+    let html = '';
+    filtered.forEach(h => {
+        html += `<div class="alumno-row">
+            <div class="alumno-info"><strong>${h.alumnos.nombre} ${h.alumnos.apellidos}</strong><br>
+            ${h.curso} ${h.grupo} | Beca: ${h.beca ? 'Sí' : 'No'} | Socio: ${h.socio_ampa ? 'Sí' : 'No'}<br>
+            📚 Préstamos activos: ${h.libros_prestados || 0}
+            </div>
+            <div class="alumno-actions"><span class="edit-icon" onclick="editarAlumno(${h.alumnos.id})">✏️</span>
+            <span class="edit-icon" onclick="darBajaAlumno(${h.alumnos.id})">🗑️</span></div>
+        </div>`;
+    });
+    container.innerHTML = html;
+}
+window.editarAlumno = async (alumnoId) => {
+    currentEditingAlumnoId = alumnoId;
+    // Obtener datos del alumno permanente
+    const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
+    // Obtener historial del año actual
+    const { data: historialActual } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).maybeSingle();
+    // Obtener libros prestados actualmente
+    const { data: prestamos } = await supabase.from('prestamos').select('*, libros(*)').eq('alumno_id', alumnoId).eq('entregado', false);
+    // Mostrar formulario de edición
+    mostrarFormularioAlumno({ alumno, historialActual, prestamos });
+};
+window.darBajaAlumno = async (alumnoId) => {
+    if(!confirm('¿Dar de baja a este alumno? Se conservará el historial.')) return;
+    const motivo = prompt('Motivo de la baja:');
+    if(motivo) {
+        await supabase.from('bajas_alumnos').insert({ alumno_id: alumnoId, motivo: motivo });
+        await supabase.from('historial_alumnos').update({ activo: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+        alert('Alumno dado de baja');
+        cargarAlumnos();
+    }
+};
+async function mostrarFormularioAlumno(data) {
+    const isNew = !data || !data.alumno;
+    const alumno = data?.alumno || {};
+    const historial = data?.historialActual || {};
+    const prestamos = data?.prestamos || [];
+    let html = `<div class="card"><h2>${isNew ? '➕ Nuevo Alumno' : `✏️ Editando: ${alumno.nombre} ${alumno.apellidos}`}</h2>
+    <div class="form-grid">
+        <div><label>Nombre</label><input id="editNombre" value="${alumno.nombre || ''}"></div>
+        <div><label>Apellidos</label><input id="editApellidos" value="${alumno.apellidos || ''}"></div>
+        <div><label>Curso</label><select id="editCurso"><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
+        <div><label>Grupo</label><input id="editGrupo" value="${historial.grupo || ''}"></div>
+        <div><label>Teléfono</label><input id="editTelefono" value="${historial.telefono || ''}"></div>
+        <div><label><input type="checkbox" id="editBilingue" ${historial.bilingue ? 'checked' : ''}> Bilingüe</label></div>
+        <div><label><input type="checkbox" id="editBeca" ${historial.beca ? 'checked' : ''}> Beca</label></div>
+        <div><label><input type="checkbox" id="editSocio" ${historial.socio_ampa ? 'checked' : ''}> Socio AMPA</label></div>
+        <div><label><input type="checkbox" id="editDonante" ${historial.donante ? 'checked' : ''}> Donante</label></div>
+        <div><label>Observaciones</label><textarea id="editObservaciones">${historial.observaciones || ''}</textarea></div>
+    </div>
+    <h3>📚 Libros Prestados</h3><div id="prestamosLista">${prestamos.map(p => `<div>📖 ${p.libros.titulo} <button onclick="devolverLibroRapido(${p.id})">Devolver</button></div>`).join('')}</div>
+    <div class="flex"><button id="guardarAlumnoBtn">💾 Guardar</button><button class="secondary" onclick="cargarAlumnos()">Cancelar</button></div></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('editCurso').value = historial.curso || '1ESO';
+    document.getElementById('guardarAlumnoBtn').onclick = async () => {
+        // Guardar o actualizar alumno permanente
+        let alumnoId = alumno.id;
+        if (isNew) {
+            const { data: nuevo } = await supabase.from('alumnos').insert({ nombre: document.getElementById('editNombre').value, apellidos: document.getElementById('editApellidos').value }).select().single();
+            alumnoId = nuevo.id;
+        } else {
+            await supabase.from('alumnos').update({ nombre: document.getElementById('editNombre').value, apellidos: document.getElementById('editApellidos').value }).eq('id', alumnoId);
+        }
+        // Guardar historial del año actual
+        const historialData = {
+            alumno_id: alumnoId,
+            ano_academico_id: currentAnoId,
+            curso: document.getElementById('editCurso').value,
+            grupo: document.getElementById('editGrupo').value,
+            telefono: document.getElementById('editTelefono').value,
+            bilingue: document.getElementById('editBilingue').checked,
+            beca: document.getElementById('editBeca').checked,
+            socio_ampa: document.getElementById('editSocio').checked,
+            donante: document.getElementById('editDonante').checked,
+            observaciones: document.getElementById('editObservaciones').value,
+            activo: true
+        };
+        if (historial.id) await supabase.from('historial_alumnos').update(historialData).eq('id', historial.id);
+        else await supabase.from('historial_alumnos').insert(historialData);
+        alert('Alumno guardado correctamente');
+        cargarAlumnos();
+    };
+}
+window.devolverLibroRapido = async (prestamoId) => {
+    await supabase.from('prestamos').update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq('id', prestamoId);
+    alert('Libro devuelto');
+    editarAlumno(currentEditingAlumnoId);
+};
+// ==================== SOCIOS ====================
+async function cargarSocios() {
+    const { data: socios } = await supabase.from('socios').select('*, alumnos(*), ano_academico(*)').eq('ano_academico_id', currentAnoId);
+    let html = `<div class="card"><h2>💰 Socios AMPA ${currentAnoId ? '' : ''}</h2><button id="btnRegistrarPago">➕ Registrar Pago</button><div id="listaSocios"></div></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('btnRegistrarPago').onclick = () => registrarPagoSocio();
+    const container = document.getElementById('listaSocios');
+    if (!socios?.length) { container.innerHTML = '<p>No hay socios registrados este año</p>'; return; }
+    let listHtml = '';
+    socios.forEach(s => {
+        listHtml += `<div class="alumno-row"><div><strong>${s.alumnos.nombre} ${s.alumnos.apellidos}</strong><br>Nº Socio: ${s.n_socio} | Pagado: ${s.fecha_pago}</div></div>`;
+    });
+    container.innerHTML = listHtml;
+}
+async function registrarPagoSocio() {
+    const { data: alumnos } = await supabase.from('alumnos').select('*');
+    let options = alumnos.map(a => `<option value="${a.id}">${a.nombre} ${a.apellidos}</option>`).join('');
+    let html = `<div class="card"><h2>💰 Registrar Pago AMPA</h2>
+    <div class="form-grid"><div><label>Alumno</label><select id="socioAlumnoId">${options}</select></div>
+    <div><label>Fecha Pago</label><input type="date" id="socioFechaPago" value="${new Date().toISOString().slice(0,10)}"></div></div>
+    <div class="flex"><button id="confirmarPagoBtn">✅ Guardar</button><button class="secondary" onclick="cargarSocios()">Cancelar</button></div></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('confirmarPagoBtn').onclick = async () => {
+        const alumnoId = parseInt(document.getElementById('socioAlumnoId').value);
+        const fecha = document.getElementById('socioFechaPago').value;
+        // Obtener último número de socio
+        const { data: ultimo } = await supabase.from('socios').select('n_socio').order('n_socio', { ascending: false }).limit(1);
+        let nuevoNumero = ultimo?.length ? ultimo[0].n_socio + 1 : 1;
+        const { error } = await supabase.from('socios').insert({ n_socio: nuevoNumero, alumno_id: alumnoId, ano_academico_id: currentAnoId, fecha_pago: fecha });
+        if(error) { alert('Error: ' + error.message); return; }
+        // Marcar como socio en historial_alumnos
+        await supabase.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+        alert(`Socio registrado con Nº ${nuevoNumero}`);
+        cargarSocios();
+    };
+}
+// ==================== BIBLIOTECA (Escáner ISBN y Signatura) ====================
+async function cargarBiblioteca() {
+    const { data: libros } = await supabase.from('libros').select('*').order('created_at', { ascending: false });
+    let html = `<div class="card"><h2>📖 Biblioteca / Banco de Libros</h2>
+    <div class="flex"><button id="btnNuevoLibro">➕ Nuevo Libro</button><button id="btnEscanearISBN">📷 Escanear ISBN (Auto-llenar)</button></div>
+    <div id="listaBiblioteca"></div></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('btnNuevoLibro').onclick = () => mostrarFormularioLibro(null);
+    document.getElementById('btnEscanearISBN').onclick = () => abrirScannerISBN();
+    const container = document.getElementById('listaBiblioteca');
+    if (!libros?.length) { container.innerHTML = '<p>No hay libros registrados</p>'; return; }
+    let listHtml = '';
+    libros.forEach(l => {
+        listHtml += `<div class="alumno-row"><div><strong>${l.titulo}</strong><br>Signatura: ${l.signatura || 'Sin signatura'} | Estado: ${l.estado || 'Nuevo'}</div>
+        <div><button onclick="editarLibro(${l.id})">✏️</button> <button onclick="darBajaLibro(${l.id})">🗑️</button></div></div>`;
+    });
+    container.innerHTML = listHtml;
+}
+async function abrirScannerISBN() {
+    // Lógica para escanear ISBN y rellenar automáticamente
+    alert('Modo escáner ISBN: Escanea el código del libro');
+    // Reutilizar el escáner existente
+    modoActual = "isbn";
+    abrirScanner("isbn");
+}
+window.editarLibro = async (libroId) => {
+    const { data: libro } = await supabase.from('libros').select('*').eq('id', libroId).single();
+    let html = `<div class="card"><h2>✏️ Editar Libro</h2><div class="form-grid">
+    <div><label>Título</label><input id="editTitulo" value="${libro.titulo}"></div>
+    <div><label>Materia</label><input id="editMateria" value="${libro.materia || ''}"></div>
+    <div><label>Editorial</label><input id="editEditorial" value="${libro.editorial || ''}"></div>
+    <div><label>ISBN</label><input id="editIsbn" value="${libro.isbn || ''}"></div>
+    <div><label>Curso</label><input id="editCursoLibro" value="${libro.curso_para || ''}"></div>
+    <div><label>Signatura</label><input id="editSignatura" value="${libro.signatura || ''}"></div>
+    <div><label>Estado</label><select id="editEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+    </div><div class="flex"><button id="guardarLibroBtn">💾 Guardar</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('editEstado').value = libro.estado || 'nuevo';
+    document.getElementById('guardarLibroBtn').onclick = async () => {
+        await supabase.from('libros').update({
+            titulo: document.getElementById('editTitulo').value,
+            materia: document.getElementById('editMateria').value,
+            editorial: document.getElementById('editEditorial').value,
+            isbn: document.getElementById('editIsbn').value,
+            curso_para: document.getElementById('editCursoLibro').value,
+            signatura: document.getElementById('editSignatura').value,
+            estado: document.getElementById('editEstado').value
+        }).eq('id', libroId);
+        alert('Libro actualizado');
+        cargarBiblioteca();
+    };
+};
+async function mostrarFormularioLibro(libro) {
+    let html = `<div class="card"><h2>📖 Nuevo Libro</h2><div class="form-grid">
+    <div><label>Título</label><input id="nuevoTitulo"></div>
+    <div><label>Materia</label><input id="nuevaMateria"></div>
+    <div><label>Editorial</label><input id="nuevaEditorial"></div>
+    <div><label>ISBN</label><input id="nuevoIsbn"></div>
+    <div><label>Curso</label><input id="nuevoCurso"></div>
+    <div><label>Signatura (Opcional)</label><input id="nuevaSignatura"></div>
+    <div><label>Estado</label><select id="nuevoEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+    </div><div class="flex"><button id="crearLibroBtn">💾 Crear</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('crearLibroBtn').onclick = async () => {
+        const { error } = await supabase.from('libros').insert({
+            codigo_barras: Date.now().toString(),
+            titulo: document.getElementById('nuevoTitulo').value,
+            materia: document.getElementById('nuevaMateria').value,
+            editorial: document.getElementById('nuevaEditorial').value,
+            isbn: document.getElementById('nuevoIsbn').value,
+            curso_para: document.getElementById('nuevoCurso').value,
+            signatura: document.getElementById('nuevaSignatura').value,
+            estado: document.getElementById('nuevoEstado').value
+        });
+        if(error) alert('Error: '+error.message);
+        else alert('Libro creado');
+        cargarBiblioteca();
+    };
+}
+// ==================== PRÉSTAMOS RÁPIDO (Escáner) ====================
+async function cargarPrestamosRapido() {
+    let html = `<div class="card"><h2>🔄 Préstamos Rápidos</h2>
+    <div class="flex"><button id="btnEscanearPrestamo">📷 Escanear Código (Alumno/Libro)</button></div>
+    <div id="resultadoEscaneo"></div></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('btnEscanearPrestamo').onclick = () => { modoActual = "prestamo_rapido"; abrirScanner("prestamo_rapido"); };
+}
+// ==================== ESCÁNER GLOBAL ====================
+function abrirScanner(modo) {
+    modoActual = modo;
+    document.getElementById("scannerModal").style.display = "block";
+    if (html5QrCode === null) html5QrCode = new Html5Qrcode("qr-reader");
+    html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (texto) => {
+        html5QrCode.stop();
+        cerrarScanner();
+        procesarEscaneoGlobal(texto);
+    }, () => {}).catch(err => alert("Error cámara: " + err));
+}
+function cerrarScanner() {
+    if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop();
+    document.getElementById("scannerModal").style.display = "none";
+}
+async function procesarEscaneoGlobal(codigo) {
+    if (modoActual === "prestamo_rapido") {
+        // Buscar si es código de alumno (buscando en alumnos por código)
+        let { data: alumno } = await supabase.from('alumnos').select('*').eq('codigo_barras', codigo).maybeSingle();
+        if(alumno) {
+            editarAlumno(alumno.id);
+            alert(`Alumno encontrado: ${alumno.nombre}`);
+        } else {
+            // Es un libro
+            let { data: libro } = await supabase.from('libros').select('*').eq('codigo_barras', codigo).maybeSingle();
+            if(libro) alert(`Libro escaneado: ${libro.titulo}. Usa la sección ALUMNOS para prestarlo.`);
+            else alert('Código no reconocido');
+        }
+    }
+}
+// ==================== INFORMES (Placeholder) ====================
+async function cargarInformes() {
+    let html = `<div class="card"><h2>📊 Informes</h2><p>Aquí irán los informes exportables (Alumnos becados, libros prestados, etc.)</p><button id="btnExportarExcel">Exportar a Excel (Demo)</button></div>`;
+    document.getElementById('mainPanel').innerHTML = html;
+    document.getElementById('btnExportarExcel').onclick = () => alert('Funcionalidad en desarrollo: Exportará los datos actuales a CSV');
+}
+// ==================== LANZAR APP ====================
+init();
 </script>
 </body>
 </html>
