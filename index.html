@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Gestión Biblioteca</title>
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Escáner QR/Barras -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, sans-serif;
+        }
+        body {
+            background: #f0f2f5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin: 5px 0;
+        }
+        button.secondary {
+            background: #64748b;
+        }
+        button.danger {
+            background: #ef4444;
+        }
+        button.success {
+            background: #10b981;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+        .libro-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 10px;
+            border-left: 4px solid #3b82f6;
+        }
+        .alumno-item {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 8px 0;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        .alumno-item:hover {
+            background: #e2e8f0;
+        }
+        .estado-prestado {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        .estado-disponible {
+            color: #10b981;
+            font-weight: bold;
+        }
+        .flex {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .hidden {
+            display: none;
+        }
+        #reader {
+            width: 100%;
+            margin-top: 10px;
+        }
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+        .tachado {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>📚 Gestión Biblioteca</h1>
+            <div class="flex">
+                <button id="btnEscanear">📷 Escanear</button>
+                <button id="btnVerPendientes" class="secondary">⏳ Pendientes</button>
+                <button id="btnBuscarAlumno" class="secondary">🔍 Buscar alumno</button>
+            </div>
+        </div>
+
+        <div id="mainPanel" class="card">
+            <h2>Bienvenido</h2>
+            <p>Pulsa "Escanear" para empezar</p>
+        </div>
+    </div>
+
+    <div id="scannerModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black; z-index:1000; padding:20px;">
+        <button id="btnCerrarScanner" style="background:white; color:black; width:auto;">✖ Cerrar</button>
+        <div id="qr-reader" style="width:100%; margin-top:20px;"></div>
+    </div>
+
+    <script>
+        // ========== CONFIGURACIÓN SUPABASE ==========
+        // REEMPLAZA ESTOS VALORES CON LOS TUYOS:
+        const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co/rest/v1/";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
+
+        const supabase = supabase_js.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let html5QrCode = null;
+        let modoActual = "prestar"; // prestar, devolver, asignarLote
+
+        // ========== FUNCIONES PRINCIPALES ==========
+
+        async function escanearLibro() {
+            mostrarScanner();
+        }
+
+        function mostrarScanner() {
+            document.getElementById("scannerModal").style.display = "block";
+            if (html5QrCode === null) {
+                html5QrCode = new Html5Qrcode("qr-reader");
+            }
+            html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                },
+                (decodedText, decodedResult) => {
+                    // Código escaneado
+                    html5QrCode.stop();
+                    document.getElementById("scannerModal").style.display = "none";
+                    procesarCodigo(decodedText);
+                },
+                (errorMessage) => {
+                    // error de escaneo, ignoramos
+                }
+            ).catch(err => {
+                console.error("Error al iniciar cámara:", err);
+                alert("No se pudo acceder a la cámara. Asegúrate de dar permisos.");
+                document.getElementById("scannerModal").style.display = "none";
+            });
+        }
+
+        function cerrarScanner() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop();
+            }
+            document.getElementById("scannerModal").style.display = "none";
+        }
+
+        async function procesarCodigo(codigo) {
+            // Buscar si el libro existe en Supabase
+            const { data: libro, error } = await supabase
+                .from("libros")
+                .select("*")
+                .eq("codigo_barras", codigo)
+                .single();
+
+            if (error && error.code !== "PGRST116") {
+                alert("Error al consultar: " + error.message);
+                mostrarMenuPrincipal();
+                return;
+            }
+
+            if (!libro) {
+                // Libro nuevo: formulario para añadirlo
+                mostrarFormularioNuevoLibro(codigo);
+            } else {
+                // Libro existe: ver si está prestado o no
+                const { data: prestamoActivo } = await supabase
+                    .from("prestamos")
+                    .select("*, alumnos(*)")
+                    .eq("libro_codigo", codigo)
+                    .eq("entregado", false)
+                    .single();
+
+                if (prestamoActivo) {
+                    // Está prestado → opción de devolver
+                    mostrarOpcionDevolver(libro, prestamoActivo);
+                } else {
+                    // Está disponible → opción de prestar
+                    mostrarOpcionPrestar(libro);
+                }
+            }
+        }
+
+        function mostrarFormularioNuevoLibro(codigo) {
+            document.getElementById("mainPanel").innerHTML = `
+                <h2>📖 Libro nuevo</h2>
+                <p>Código: <strong>${codigo}</strong></p>
+                <input type="text" id="titulo" placeholder="Título del libro" autocomplete="off">
+                <input type="text" id="editorial" placeholder="Editorial (opcional)">
+                <button id="btnGuardarLibro">Guardar libro</button>
+                <button id="btnCancelar" class="secondary">Cancelar</button>
+            `;
+            document.getElementById("btnGuardarLibro").onclick = async () => {
+                const titulo = document.getElementById("titulo").value.trim();
+                if (!titulo) {
+                    alert("El título es obligatorio");
+                    return;
+                }
+                const { error } = await supabase.from("libros").insert({
+                    codigo_barras: codigo,
+                    titulo: titulo,
+                    editorial: document.getElementById("editorial").value
+                });
+                if (error) {
+                    alert("Error al guardar: " + error.message);
+                } else {
+                    alert("✅ Libro guardado correctamente");
+                    // Después de guardar, preguntar si quiere prestarlo ahora
+                    mostrarOpcionPrestar({ codigo_barras: codigo, titulo: titulo });
+                }
+            };
+            document.getElementById("btnCancelar").onclick = mostrarMenuPrincipal;
+        }
+
+        function mostrarOpcionPrestar(libro) {
+            document.getElementById("mainPanel").innerHTML = `
+                <h2>📖 ${libro.titulo}</h2>
+                <p>Código: ${libro.codigo_barras}</p>
+                <p class="estado-disponible">✅ Disponible para prestar</p>
+                <input type="text" id="nombreAlumno" placeholder="Nombre del alumno" autocomplete="off">
+                <input type="text" id="curso" placeholder="Curso (opcional)">
+                <button id="btnPrestar">🔖 Prestar libro</button>
+                <button id="btnCancelar" class="secondary">Volver</button>
+            `;
+            document.getElementById("btnPrestar").onclick = async () => {
+                const nombreAlumno = document.getElementById("nombreAlumno").value.trim();
+                if (!nombreAlumno) {
+                    alert("Debes escribir el nombre del alumno");
+                    return;
+                }
+                const curso = document.getElementById("curso").value;
+                
+                // Buscar o crear alumno
+                let { data: alumno } = await supabase
+                    .from("alumnos")
+                    .select("id")
+                    .eq("nombre", nombreAlumno)
+                    .maybeSingle();
+                
+                if (!alumno) {
+                    const { data: nuevoAlumno, error } = await supabase
+                        .from("alumnos")
+                        .insert({ nombre: nombreAlumno, curso: curso })
+                        .select()
+                        .single();
+                    if (error) {
+                        alert("Error al crear alumno: " + error.message);
+                        return;
+                    }
+                    alumno = nuevoAlumno;
+                }
+                
+                // Crear préstamo
+                const { error } = await supabase.from("prestamos").insert({
+                    libro_codigo: libro.codigo_barras,
+                    alumno_id: alumno.id,
+                    fecha_prestamo: new Date().toISOString().split('T')[0]
+                });
+                
+                if (error) {
+                    alert("Error al prestar: " + error.message);
+                } else {
+                    alert(`✅ Libro prestado a ${nombreAlumno}`);
+                    mostrarMenuPrincipal();
+                }
+            };
+            document.getElementById("btnCancelar").onclick = mostrarMenuPrincipal;
+        }
+
+        function mostrarOpcionDevolver(libro, prestamo) {
+            document.getElementById("mainPanel").innerHTML = `
+                <h2>📖 ${libro.titulo}</h2>
+                <p>Código: ${libro.codigo_barras}</p>
+                <p class="estado-prestado">⚠️ Prestado a: <strong>${prestamo.alumnos?.nombre || "Alumno"}</strong></p>
+                <button id="btnDevolver">✅ Marcar como devuelto</button>
+                <button id="btnCancelar" class="secondary">Volver</button>
+            `;
+            document.getElementById("btnDevolver").onclick = async () => {
+                const { error } = await supabase
+                    .from("prestamos")
+                    .update({ entregado: true, fecha_devolucion: new Date().toISOString().split('T')[0] })
+                    .eq("id", prestamo.id);
+                
+                if (error) {
+                    alert("Error al devolver: " + error.message);
+                } else {
+                    alert(`✅ Libro devuelto correctamente`);
+                    mostrarMenuPrincipal();
+                }
+            };
+            document.getElementById("btnCancelar").onclick = mostrarMenuPrincipal;
+        }
+
+        async function mostrarPendientes() {
+            const { data: pendientes, error } = await supabase
+                .from("prestamos_activos")
+                .select("*")
+                .order("alumno");
+            
+            if (error) {
+                document.getElementById("mainPanel").innerHTML = `<p>Error: ${error.message}</p>`;
+                return;
+            }
+            
+            if (!pendientes || pendientes.length === 0) {
+                document.getElementById("mainPanel").innerHTML = `<h2>✅ No hay préstamos activos</h2><button onclick="mostrarMenuPrincipal()">Volver</button>`;
+                return;
+            }
+            
+            let html = `<h2>⏳ Préstamos activos (${pendientes.length})</h2>`;
+            let ultimoAlumno = "";
+            pendientes.forEach(p => {
+                if (p.alumno !== ultimoAlumno) {
+                    if (ultimoAlumno !== "") html += `</div>`;
+                    html += `<div style="margin-top:15px;"><strong>👤 ${p.alumno}</strong> (${p.curso || "sin curso"})<div style="margin-left:15px;">`;
+                    ultimoAlumno = p.alumno;
+                }
+                html += `<div class="libro-item">📖 ${p.libro}</div>`;
+            });
+            html += `</div></div><button onclick="mostrarMenuPrincipal()">Volver</button>`;
+            document.getElementById("mainPanel").innerHTML = html;
+        }
+
+        async function buscarAlumno() {
+            document.getElementById("mainPanel").innerHTML = `
+                <h2>🔍 Buscar alumno</h2>
+                <input type="text" id="searchNombre" placeholder="Escribe el nombre" autocomplete="off">
+                <button id="btnBuscar">Buscar</button>
+                <button id="btnCancelar" class="secondary">Volver</button>
+                <div id="resultadosBusqueda"></div>
+            `;
+            document.getElementById("btnBuscar").onclick = async () => {
+                const nombre = document.getElementById("searchNombre").value.trim();
+                if (!nombre) return;
+                
+                const { data: alumnos, error } = await supabase
+                    .from("alumnos")
+                    .select("*")
+                    .ilike("nombre", `%${nombre}%`);
+                
+                if (error) {
+                    document.getElementById("resultadosBusqueda").innerHTML = `<p>Error: ${error.message}</p>`;
+                    return;
+                }
+                
+                if (alumnos.length === 0) {
+                    document.getElementById("resultadosBusqueda").innerHTML = `<p>No se encontraron alumnos</p>`;
+                    return;
+                }
+                
+                let html = `<h3>Resultados:</h3>`;
+                for (const alumno of alumnos) {
+                    const { data: prestamos } = await supabase
+                        .from("prestamos_activos")
+                        .select("*")
+                        .eq("alumno", alumno.nombre);
+                    
+                    html += `<div class="alumno-item" onclick="verDetalleAlumno(${alumno.id})">
+                        <strong>${alumno.nombre}</strong> (${alumno.curso || "sin curso"})<br>
+                        📚 ${prestamos?.length || 0} libros prestados
+                    </div>`;
+                }
+                document.getElementById("resultadosBusqueda").innerHTML = html;
+            };
+            document.getElementById("btnCancelar").onclick = mostrarMenuPrincipal;
+        }
+        
+        window.verDetalleAlumno = async (alumnoId) => {
+            const { data: alumno } = await supabase.from("alumnos").select("*").eq("id", alumnoId).single();
+            const { data: prestamos } = await supabase
+                .from("prestamos_activos")
+                .select("*")
+                .eq("alumno", alumno.nombre);
+            
+            let html = `<h2>📋 ${alumno.nombre}</h2>
+                <p>Curso: ${alumno.curso || "No especificado"}</p>
+                <h3>📚 Libros prestados (${prestamos?.length || 0})</h3>`;
+            if (prestamos && prestamos.length > 0) {
+                prestamos.forEach(p => {
+                    html += `<div class="libro-item">📖 ${p.libro}</div>`;
+                });
+            } else {
+                html += `<p>No tiene libros prestados actualmente</p>`;
+            }
+            html += `<button onclick="mostrarMenuPrincipal()">Volver</button>`;
+            document.getElementById("mainPanel").innerHTML = html;
+        };
+
+        function mostrarMenuPrincipal() {
+            document.getElementById("mainPanel").innerHTML = `
+                <h2>Bienvenido</h2>
+                <p>Pulsa "Escanear" para gestionar libros</p>
+                <p>También puedes ver préstamos activos o buscar alumnos</p>
+            `;
+        }
+
+        // ========== EVENTOS BOTONES ==========
+        document.getElementById("btnEscanear").onclick = escanearLibro;
+        document.getElementById("btnVerPendientes").onclick = mostrarPendientes;
+        document.getElementById("btnBuscarAlumno").onclick = buscarAlumno;
+        document.getElementById("btnCerrarScanner").onclick = cerrarScanner;
+
+        mostrarMenuPrincipal();
+    </script>
+</body>
+</html>
