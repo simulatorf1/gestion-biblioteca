@@ -114,7 +114,7 @@ const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
 // ========================================================
 
-window supabase = supabase_js.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = supabase_js.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Variables globales
 let html5QrCode = null;
@@ -273,7 +273,7 @@ async function asignarLote() {
     
     // Insertar préstamos
     for (const libro of loteTemporal) {
-        await supabase.from("prestamos").insert({
+        await supabaseClient.from("prestamos").insert({
             libro_codigo: libro.codigo_barras,
             alumno_id: alumno.id,
             fecha_prestamo: new Date().toISOString().slice(0,10)
