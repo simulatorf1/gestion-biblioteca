@@ -203,7 +203,7 @@
             html += `<button id="btnVolver">← Volver</button>`;
             mostrarPanel(html);
             
-            document.getElementById("btnEscanearLote")?.onclick = () => abrirScanner("lote");
+            document.getElementById("btnEscanearLote").onclick = function() { iniciarLote(); };
             document.getElementById("btnCancelarLote")?.onclick = () => { loteLibros = []; mostrarLote(); };
             document.getElementById("btnAsignar")?.onclick = asignarLote;
             document.getElementById("btnVolver").onclick = menuPrincipal;
@@ -413,10 +413,10 @@
 
         // Conectar botones
         document.getElementById("btnLote").onclick = () => { loteLibros = []; mostrarLote(); };
-        document.getElementById("btnDevolucion").onclick = iniciarDevolucion;
-        document.getElementById("btnPendientes").onclick = mostrarPendientes;
-        document.getElementById("btnBuscar").onclick = buscarAlumno;
-        document.getElementById("btnCerrar").onclick = cerrarScanner;
+        document.getElementById("btnEscanearDevolucion").onclick = function() { iniciarDevolucion(); };
+        document.getElementById("btnVerPendientes").onclick = function() { mostrarPendientes(); };
+        document.getElementById("btnBuscarAlumno").onclick = function() { buscarAlumno(); };
+        document.getElementById("btnCerrarScanner").onclick = function() { cerrarScanner(); };
 
         menuPrincipal();
     </script>
