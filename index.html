@@ -87,338 +87,339 @@
         <div id="qr-reader"></div>
     </div>
 
+
     <script>
-        // ⚠️ CAMBIA ESTOS VALORES POR LOS TUYOS ⚠️
-        const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co/rest/v1/";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
-
-        const supabase = supabase_js.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        
-        let scanner = null;
-        let modoActual = "";
-        let loteLibros = [];
-        let alumnoDevolucion = null;
-        let librosAlumno = [];
-
-        // Mostrar mensaje en el panel
-        function mostrarPanel(contenido) {
-            document.getElementById("panel").innerHTML = contenido;
-        }
-
-        // Abrir escáner
-        function abrirScanner(modo) {
-            modoActual = modo;
-            document.getElementById("scannerModal").style.display = "block";
+            // ⚠️ CAMBIA ESTOS VALORES POR LOS TUYOS ⚠️
+            const SUPABASE_URL = "https://klwrclwbzvupqxcxljst.supabase.co";
+            const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
+    
+            const supabase = supabase_js.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             
-            if (scanner === null) {
-                scanner = new Html5Qrcode("qr-reader");
+            let scanner = null;
+            let modoActual = "";
+            let loteLibros = [];
+            let alumnoDevolucion = null;
+            let librosAlumno = [];
+    
+            function mostrarPanel(contenido) {
+                document.getElementById("panel").innerHTML = contenido;
             }
-            
-            scanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: 250 },
-                onScanSuccess,
-                onScanError
-            ).catch(err => {
-                alert("Error al abrir cámara: " + err);
-                cerrarScanner();
-            });
-        }
-
-        function onScanSuccess(decodedText) {
-            scanner.stop();
-            cerrarScanner();
-            procesarCodigo(decodedText);
-        }
-
-        function onScanError(err) {
-            // ignorar errores normales de escaneo
-        }
-
-        function cerrarScanner() {
-            if (scanner && scanner.isScanning) {
+    
+            function abrirScanner(modo) {
+                modoActual = modo;
+                document.getElementById("scannerModal").style.display = "block";
+                
+                if (scanner === null) {
+                    scanner = new Html5Qrcode("qr-reader");
+                }
+                
+                scanner.start(
+                    { facingMode: "environment" },
+                    { fps: 10, qrbox: 250 },
+                    onScanSuccess,
+                    onScanError
+                ).catch(err => {
+                    alert("Error al abrir cámara: " + err);
+                    cerrarScanner();
+                });
+            }
+    
+            function onScanSuccess(decodedText) {
                 scanner.stop();
+                cerrarScanner();
+                procesarCodigo(decodedText);
             }
-            document.getElementById("scannerModal").style.display = "none";
-        }
-
-        // Procesar código escaneado
-        async function procesarCodigo(codigo) {
-            // Buscar o crear libro
-            let { data: libro } = await supabase
-                .from("libros")
-                .select("*")
-                .eq("codigo_barras", codigo)
-                .maybeSingle();
-            
-            if (!libro) {
-                let titulo = prompt("Libro nuevo. Introduce el título:");
-                if (!titulo) {
-                    alert("Libro no añadido");
-                    if (modoActual === "lote") mostrarLote();
-                    return;
+    
+            function onScanError(err) {}
+    
+            function cerrarScanner() {
+                if (scanner && scanner.isScanning) {
+                    scanner.stop();
                 }
-                let { data: nuevo } = await supabase
+                document.getElementById("scannerModal").style.display = "none";
+            }
+    
+            async function procesarCodigo(codigo) {
+                let { data: libro } = await supabase
                     .from("libros")
-                    .insert({ codigo_barras: codigo, titulo: titulo })
-                    .select()
-                    .single();
-                libro = nuevo;
-                alert("✅ Libro añadido: " + titulo);
-            }
-            
-            if (modoActual === "lote") {
-                if (!loteLibros.find(l => l.codigo_barras === libro.codigo_barras)) {
-                    loteLibros.push(libro);
-                    alert("📚 Añadido: " + libro.titulo + " (Total: " + loteLibros.length + ")");
-                } else {
-                    alert("⚠️ Ya está en el lote");
+                    .select("*")
+                    .eq("codigo_barras", codigo)
+                    .maybeSingle();
+                
+                if (!libro) {
+                    let titulo = prompt("Libro nuevo. Introduce el título:");
+                    if (!titulo) {
+                        alert("Libro no añadido");
+                        if (modoActual === "lote") mostrarLote();
+                        return;
+                    }
+                    let { data: nuevo } = await supabase
+                        .from("libros")
+                        .insert({ codigo_barras: codigo, titulo: titulo })
+                        .select()
+                        .single();
+                    libro = nuevo;
+                    alert("✅ Libro añadido: " + titulo);
                 }
-                mostrarLote();
+                
+                if (modoActual === "lote") {
+                    if (!loteLibros.find(l => l.codigo_barras === libro.codigo_barras)) {
+                        loteLibros.push(libro);
+                        alert("📚 Añadido: " + libro.titulo + " (Total: " + loteLibros.length + ")");
+                    } else {
+                        alert("⚠️ Ya está en el lote");
+                    }
+                    mostrarLote();
+                }
+                else if (modoActual === "devolucion") {
+                    await procesarDevolucionLibro(libro);
+                }
             }
-            else if (modoActual === "devolucion") {
-                await procesarDevolucionLibro(libro);
+    
+            function mostrarLote() {
+                let html = `<h2>📦 Entrega por lote</h2>
+                    <button id="btnEscanearLote">📷 Escanear libro</button>
+                    <button id="btnCancelarLote" class="secondary">Cancelar lote</button>
+                    <h3>Libros (${loteLibros.length})</h3>`;
+                
+                if (loteLibros.length === 0) {
+                    html += "<p>No hay libros escaneados</p>";
+                } else {
+                    loteLibros.forEach(l => {
+                        html += `<div class="libro">📖 ${l.titulo}</div>`;
+                    });
+                    html += `<hr>
+                        <input type="text" id="nombreAlumno" placeholder="Nombre del alumno">
+                        <input type="text" id="cursoAlumno" placeholder="Curso">
+                        <button id="btnAsignar">✅ Asignar ${loteLibros.length} libros</button>`;
+                }
+                
+                html += `<button id="btnVolver">← Volver</button>`;
+                mostrarPanel(html);
+                
+                document.getElementById("btnEscanearLote").onclick = function() { abrirScanner("lote"); };
+                document.getElementById("btnCancelarLote").onclick = function() { loteLibros = []; mostrarLote(); };
+                if (document.getElementById("btnAsignar")) {
+                    document.getElementById("btnAsignar").onclick = asignarLote;
+                }
+                document.getElementById("btnVolver").onclick = menuPrincipal;
             }
-        }
-
-        // ========== LOTE ==========
-        function mostrarLote() {
-            let html = `<h2>📦 Entrega por lote</h2>
-                <button id="btnEscanearLote">📷 Escanear libro</button>
-                <button id="btnCancelarLote" class="secondary">Cancelar lote</button>
-                <h3>Libros (${loteLibros.length})</h3>`;
-            
-            if (loteLibros.length === 0) {
-                html += "<p>No hay libros escaneados</p>";
-            } else {
-                loteLibros.forEach(l => {
-                    html += `<div class="libro">📖 ${l.titulo}</div>`;
-                });
-                html += `<hr>
-                    <input type="text" id="nombreAlumno" placeholder="Nombre del alumno">
-                    <input type="text" id="cursoAlumno" placeholder="Curso">
-                    <button id="btnAsignar">✅ Asignar ${loteLibros.length} libros</button>`;
-            }
-            
-            html += `<button id="btnVolver">← Volver</button>`;
-            mostrarPanel(html);
-            
-            document.getElementById("btnEscanearLote").onclick = function() { iniciarLote(); };
-            document.getElementById("btnCancelarLote")?.onclick = () => { loteLibros = []; mostrarLote(); };
-            document.getElementById("btnAsignar")?.onclick = asignarLote;
-            document.getElementById("btnVolver").onclick = menuPrincipal;
-        }
-
-        async function asignarLote() {
-            let nombre = document.getElementById("nombreAlumno").value.trim();
-            if (!nombre) { alert("Escribe el nombre"); return; }
-            let curso = document.getElementById("cursoAlumno").value;
-            
-            let { data: alumno } = await supabase
-                .from("alumnos")
-                .select("id")
-                .eq("nombre", nombre)
-                .maybeSingle();
-            
-            if (!alumno) {
-                let { data: nuevo } = await supabase
+    
+            async function asignarLote() {
+                let nombre = document.getElementById("nombreAlumno").value.trim();
+                if (!nombre) { alert("Escribe el nombre"); return; }
+                let curso = document.getElementById("cursoAlumno").value;
+                
+                let { data: alumno } = await supabase
                     .from("alumnos")
-                    .insert({ nombre: nombre, curso: curso })
-                    .select()
-                    .single();
-                alumno = nuevo;
-            }
-            
-            for (let libro of loteLibros) {
-                await supabase.from("prestamos").insert({
-                    libro_codigo: libro.codigo_barras,
-                    alumno_id: alumno.id,
-                    fecha_prestamo: new Date().toISOString().slice(0,10)
-                });
-            }
-            
-            alert("✅ " + loteLibros.length + " libros asignados a " + nombre);
-            loteLibros = [];
-            menuPrincipal();
-        }
-
-        // ========== DEVOLUCIÓN ==========
-        async function iniciarDevolucion() {
-            alumnoDevolucion = null;
-            modoActual = "devolucion";
-            mostrarPanel(`
-                <h2>🔄 Devolución</h2>
-                <p>Escanea el PRIMER libro para identificar al alumno</p>
-                <button id="btnPrimerLibro">📷 Escanear primer libro</button>
-                <button id="btnCancelarDevo" class="secondary">Cancelar</button>
-            `);
-            document.getElementById("btnPrimerLibro")?.onclick = () => abrirScanner("devolucion");
-            document.getElementById("btnCancelarDevo")?.onclick = menuPrincipal;
-        }
-
-        async function procesarDevolucionLibro(libro) {
-            if (!alumnoDevolucion) {
-                // Buscar quién tiene este libro
-                let { data: prestamo } = await supabase
-                    .from("prestamos")
-                    .select("*, alumnos(*)")
-                    .eq("libro_codigo", libro.codigo_barras)
-                    .eq("entregado", false)
-                    .single();
+                    .select("id")
+                    .eq("nombre", nombre)
+                    .maybeSingle();
                 
-                if (!prestamo) {
-                    alert("Este libro no está prestado");
-                    iniciarDevolucion();
-                    return;
+                if (!alumno) {
+                    let { data: nuevo } = await supabase
+                        .from("alumnos")
+                        .insert({ nombre: nombre, curso: curso })
+                        .select()
+                        .single();
+                    alumno = nuevo;
                 }
                 
-                alumnoDevolucion = prestamo.alumnos;
-                
-                // Obtener todos sus libros pendientes
-                let { data: prestamos } = await supabase
-                    .from("prestamos")
-                    .select("*, libros(*)")
-                    .eq("alumno_id", alumnoDevolucion.id)
-                    .eq("entregado", false);
-                
-                librosAlumno = prestamos.map(p => ({
-                    id: p.id,
-                    codigo: p.libros.codigo_barras,
-                    titulo: p.libros.titulo,
-                    devuelto: false
-                }));
-                
-                // Marcar el que acabamos de escanear como devuelto
-                let encontrado = librosAlumno.find(l => l.codigo === libro.codigo_barras);
-                if (encontrado) {
-                    await supabase.from("prestamos").update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq("id", encontrado.id);
-                    encontrado.devuelto = true;
+                for (let libro of loteLibros) {
+                    await supabase.from("prestamos").insert({
+                        libro_codigo: libro.codigo_barras,
+                        alumno_id: alumno.id,
+                        fecha_prestamo: new Date().toISOString().slice(0,10)
+                    });
                 }
                 
-                mostrarListaDevolucion();
-            } else {
-                // Ya tenemos alumno, marcar este libro como devuelto
-                let encontrado = librosAlumno.find(l => l.codigo === libro.codigo_barras);
-                if (encontrado && !encontrado.devuelto) {
-                    await supabase.from("prestamos").update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq("id", encontrado.id);
-                    encontrado.devuelto = true;
-                    alert("✅ Devuelto: " + libro.titulo);
+                alert("✅ " + loteLibros.length + " libros asignados a " + nombre);
+                loteLibros = [];
+                menuPrincipal();
+            }
+    
+            async function iniciarDevolucion() {
+                alumnoDevolucion = null;
+                modoActual = "devolucion";
+                mostrarPanel(`
+                    <h2>🔄 Devolución</h2>
+                    <p>Escanea el PRIMER libro para identificar al alumno</p>
+                    <button id="btnPrimerLibro">📷 Escanear primer libro</button>
+                    <button id="btnCancelarDevo" class="secondary">Cancelar</button>
+                `);
+                let btnPrimer = document.getElementById("btnPrimerLibro");
+                if (btnPrimer) btnPrimer.onclick = function() { abrirScanner("devolucion"); };
+                let btnCancelar = document.getElementById("btnCancelarDevo");
+                if (btnCancelar) btnCancelar.onclick = menuPrincipal;
+            }
+    
+            async function procesarDevolucionLibro(libro) {
+                if (!alumnoDevolucion) {
+                    let { data: prestamo } = await supabase
+                        .from("prestamos")
+                        .select("*, alumnos(*)")
+                        .eq("libro_codigo", libro.codigo_barras)
+                        .eq("entregado", false)
+                        .maybeSingle();
+                    
+                    if (!prestamo) {
+                        alert("Este libro no está prestado");
+                        iniciarDevolucion();
+                        return;
+                    }
+                    
+                    alumnoDevolucion = prestamo.alumnos;
+                    
+                    let { data: prestamos } = await supabase
+                        .from("prestamos")
+                        .select("*, libros(*)")
+                        .eq("alumno_id", alumnoDevolucion.id)
+                        .eq("entregado", false);
+                    
+                    librosAlumno = prestamos.map(p => ({
+                        id: p.id,
+                        codigo: p.libros.codigo_barras,
+                        titulo: p.libros.titulo,
+                        devuelto: false
+                    }));
+                    
+                    let encontrado = librosAlumno.find(l => l.codigo === libro.codigo_barras);
+                    if (encontrado) {
+                        await supabase.from("prestamos").update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq("id", encontrado.id);
+                        encontrado.devuelto = true;
+                    }
+                    
                     mostrarListaDevolucion();
-                } else if (encontrado && encontrado.devuelto) {
-                    alert("⚠️ Ese libro ya fue devuelto");
                 } else {
-                    alert("⚠️ Este libro no pertenece a " + alumnoDevolucion.nombre);
+                    let encontrado = librosAlumno.find(l => l.codigo === libro.codigo_barras);
+                    if (encontrado && !encontrado.devuelto) {
+                        await supabase.from("prestamos").update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq("id", encontrado.id);
+                        encontrado.devuelto = true;
+                        alert("✅ Devuelto: " + libro.titulo);
+                        mostrarListaDevolucion();
+                    } else if (encontrado && encontrado.devuelto) {
+                        alert("⚠️ Ese libro ya fue devuelto");
+                    } else {
+                        alert("⚠️ Este libro no pertenece a " + alumnoDevolucion.nombre);
+                    }
                 }
             }
-        }
-
-        function mostrarListaDevolucion() {
-            let todosDevueltos = librosAlumno.every(l => l.devuelto);
-            let html = `<h2>🔄 Devolviendo: ${alumnoDevolucion.nombre}</h2>
-                <p>Curso: ${alumnoDevolucion.curso || "-"}</p>
-                <h3>Libros pendientes:</h3>`;
-            
-            if (todosDevueltos) {
-                html += `<p>✅ ¡Todos los libros devueltos!</p>
-                    <button id="btnFinalizar" class="secondary">Finalizar</button>`;
-            } else {
-                html += `<button id="btnEscanearDevo">📷 Escanear siguiente libro</button>`;
-                librosAlumno.forEach(l => {
-                    let clase = l.devuelto ? "tachado" : "";
-                    html += `<div class="libro ${clase}">📖 ${l.titulo} ${l.devuelto ? "✅" : "⏳"}</div>`;
-                });
-            }
-            html += `<button id="btnCancelarDevo2" class="secondary">Cancelar</button>`;
-            mostrarPanel(html);
-            
-            if (!todosDevueltos) {
-                document.getElementById("btnEscanearDevo")?.onclick = () => abrirScanner("devolucion");
-            } else {
-                document.getElementById("btnFinalizar")?.onclick = () => { alumnoDevolucion = null; menuPrincipal(); };
-            }
-            document.getElementById("btnCancelarDevo2")?.onclick = () => { alumnoDevolucion = null; menuPrincipal(); };
-        }
-
-        // ========== PRÉSTAMOS ACTIVOS ==========
-        async function mostrarPendientes() {
-            let { data: pendientes } = await supabase.from("prestamos_activos").select("*").order("alumno");
-            if (!pendientes || pendientes.length === 0) {
-                mostrarPanel(`<h2>✅ No hay préstamos activos</h2><button id="btnVolver">Volver</button>`);
-                document.getElementById("btnVolver")?.onclick = menuPrincipal;
-                return;
-            }
-            let html = `<h2>📋 Préstamos activos (${pendientes.length})</h2>`;
-            let ultimo = "";
-            pendientes.forEach(p => {
-                if (p.alumno !== ultimo) {
-                    if (ultimo !== "") html += `</div>`;
-                    html += `<div><strong>👤 ${p.alumno}</strong><div style="margin-left:15px;">`;
-                    ultimo = p.alumno;
+    
+            function mostrarListaDevolucion() {
+                let todosDevueltos = librosAlumno.every(l => l.devuelto);
+                let html = `<h2>🔄 Devolviendo: ${alumnoDevolucion.nombre}</h2>
+                    <p>Curso: ${alumnoDevolucion.curso || "-"}</p>
+                    <h3>Libros pendientes:</h3>`;
+                
+                if (todosDevueltos) {
+                    html += `<p>✅ ¡Todos los libros devueltos!</p>
+                        <button id="btnFinalizar" class="secondary">Finalizar</button>`;
+                } else {
+                    html += `<button id="btnEscanearDevo">📷 Escanear siguiente libro</button>`;
+                    librosAlumno.forEach(l => {
+                        let clase = l.devuelto ? "tachado" : "";
+                        html += `<div class="libro ${clase}">📖 ${l.titulo} ${l.devuelto ? "✅" : "⏳"}</div>`;
+                    });
                 }
-                html += `<div class="libro">📖 ${p.libro}</div>`;
-            });
-            html += `</div></div><button id="btnVolver">Volver</button>`;
-            mostrarPanel(html);
-            document.getElementById("btnVolver").onclick = menuPrincipal;
-        }
-
-        // ========== BUSCAR ALUMNO ==========
-        async function buscarAlumno() {
-            mostrarPanel(`
-                <h2>🔍 Buscar alumno</h2>
-                <input type="text" id="nombreBuscar" placeholder="Nombre">
-                <button id="btnBuscarNombre">Buscar</button>
-                <button id="btnVolver" class="secondary">Volver</button>
-                <div id="resultados"></div>
-            `);
-            document.getElementById("btnBuscarNombre").onclick = async () => {
-                let nombre = document.getElementById("nombreBuscar").value.trim();
-                if (!nombre) return;
-                let { data: alumnos } = await supabase.from("alumnos").select("*").ilike("nombre", `%${nombre}%`);
-                if (!alumnos || alumnos.length === 0) {
-                    document.getElementById("resultados").innerHTML = "<p>No encontrado</p>";
+                html += `<button id="btnCancelarDevo2" class="secondary">Cancelar</button>`;
+                mostrarPanel(html);
+                
+                if (!todosDevueltos) {
+                    let btnEscanear = document.getElementById("btnEscanearDevo");
+                    if (btnEscanear) btnEscanear.onclick = function() { abrirScanner("devolucion"); };
+                } else {
+                    let btnFinalizar = document.getElementById("btnFinalizar");
+                    if (btnFinalizar) btnFinalizar.onclick = function() { alumnoDevolucion = null; menuPrincipal(); };
+                }
+                let btnCancelar = document.getElementById("btnCancelarDevo2");
+                if (btnCancelar) btnCancelar.onclick = function() { alumnoDevolucion = null; menuPrincipal(); };
+            }
+    
+            async function mostrarPendientes() {
+                let { data: pendientes } = await supabase.from("prestamos_activos").select("*").order("alumno");
+                if (!pendientes || pendientes.length === 0) {
+                    mostrarPanel(`<h2>✅ No hay préstamos activos</h2><button id="btnVolver">Volver</button>`);
+                    let btnVolver = document.getElementById("btnVolver");
+                    if (btnVolver) btnVolver.onclick = menuPrincipal;
                     return;
                 }
-                let html = "";
-                for (let a of alumnos) {
-                    let { data: prestamos } = await supabase.from("prestamos_activos").select("*").eq("alumno", a.nombre);
-                    html += `<div style="background:white; padding:10px; margin:5px; border-radius:5px;">
-                        <strong>${a.nombre}</strong> (${a.curso || "-"})<br>
-                        📚 ${prestamos?.length || 0} libros prestados
-                        <button onclick="verLibrosAlumno(${a.id}, '${a.nombre}')">Ver libros</button>
-                    </div>`;
+                let html = `<h2>📋 Préstamos activos (${pendientes.length})</h2>`;
+                let ultimo = "";
+                pendientes.forEach(p => {
+                    if (p.alumno !== ultimo) {
+                        if (ultimo !== "") html += `</div>`;
+                        html += `<div><strong>👤 ${p.alumno}</strong><div style="margin-left:15px;">`;
+                        ultimo = p.alumno;
+                    }
+                    html += `<div class="libro">📖 ${p.libro}</div>`;
+                });
+                html += `</div></div><button id="btnVolver">Volver</button>`;
+                mostrarPanel(html);
+                let btnVolver = document.getElementById("btnVolver");
+                if (btnVolver) btnVolver.onclick = menuPrincipal;
+            }
+    
+            async function buscarAlumno() {
+                mostrarPanel(`
+                    <h2>🔍 Buscar alumno</h2>
+                    <input type="text" id="nombreBuscar" placeholder="Nombre">
+                    <button id="btnBuscarNombre">Buscar</button>
+                    <button id="btnVolver" class="secondary">Volver</button>
+                    <div id="resultados"></div>
+                `);
+                let btnBuscar = document.getElementById("btnBuscarNombre");
+                if (btnBuscar) {
+                    btnBuscar.onclick = async function() {
+                        let nombre = document.getElementById("nombreBuscar").value.trim();
+                        if (!nombre) return;
+                        let { data: alumnos } = await supabase.from("alumnos").select("*").ilike("nombre", `%${nombre}%`);
+                        if (!alumnos || alumnos.length === 0) {
+                            document.getElementById("resultados").innerHTML = "<p>No encontrado</p>";
+                            return;
+                        }
+                        let html = "";
+                        for (let a of alumnos) {
+                            let { data: prestamos } = await supabase.from("prestamos_activos").select("*").eq("alumno", a.nombre);
+                            html += `<div style="background:white; padding:10px; margin:5px; border-radius:5px;">
+                                <strong>${a.nombre}</strong> (${a.curso || "-"})<br>
+                                📚 ${prestamos?.length || 0} libros prestados
+                                <button onclick="verLibrosAlumno(${a.id}, '${a.nombre}')">Ver libros</button>
+                            </div>`;
+                        }
+                        document.getElementById("resultados").innerHTML = html;
+                    };
                 }
-                document.getElementById("resultados").innerHTML = html;
+                let btnVolver = document.getElementById("btnVolver");
+                if (btnVolver) btnVolver.onclick = menuPrincipal;
+            }
+    
+            window.verLibrosAlumno = async function(id, nombre) {
+                let { data: prestamos } = await supabase.from("prestamos_activos").select("*").eq("alumno", nombre);
+                let html = `<h2>📚 ${nombre}</h2>`;
+                if (!prestamos || prestamos.length === 0) html += "<p>No tiene libros prestados</p>";
+                else prestamos.forEach(p => { html += `<div class="libro">📖 ${p.libro}</div>`; });
+                html += `<button id="btnVolverLibros">Volver</button>`;
+                mostrarPanel(html);
+                let btnVolver = document.getElementById("btnVolverLibros");
+                if (btnVolver) btnVolver.onclick = buscarAlumno;
             };
-            document.getElementById("btnVolver").onclick = menuPrincipal;
-        }
-
-        window.verLibrosAlumno = async (id, nombre) => {
-            let { data: prestamos } = await supabase.from("prestamos_activos").select("*").eq("alumno", nombre);
-            let html = `<h2>📚 ${nombre}</h2>`;
-            if (!prestamos || prestamos.length === 0) html += "<p>No tiene libros prestados</p>";
-            else prestamos.forEach(p => { html += `<div class="libro">📖 ${p.libro}</div>`; });
-            html += `<button id="btnVolverLibros">Volver</button>`;
-            mostrarPanel(html);
-            document.getElementById("btnVolverLibros").onclick = buscarAlumno;
-        };
-
-        // ========== MENÚ PRINCIPAL ==========
-        function menuPrincipal() {
-            modoActual = "";
-            loteLibros = [];
-            alumnoDevolucion = null;
-            mostrarPanel(`<p>Selecciona una opción arriba</p>`);
-        }
-
-        // Conectar botones
-        document.getElementById("btnLote").onclick = () => { loteLibros = []; mostrarLote(); };
-        document.getElementById("btnEscanearDevolucion").onclick = function() { iniciarDevolucion(); };
-        document.getElementById("btnVerPendientes").onclick = function() { mostrarPendientes(); };
-        document.getElementById("btnBuscarAlumno").onclick = function() { buscarAlumno(); };
-        document.getElementById("btnCerrarScanner").onclick = function() { cerrarScanner(); };
-
-        menuPrincipal();
+    
+            function menuPrincipal() {
+                modoActual = "";
+                loteLibros = [];
+                alumnoDevolucion = null;
+                mostrarPanel(`<p>Selecciona una opción arriba</p>`);
+            }
+    
+            // Conectar botones principales
+            document.getElementById("btnLote").onclick = function() { loteLibros = []; mostrarLote(); };
+            document.getElementById("btnDevolucion").onclick = function() { iniciarDevolucion(); };
+            document.getElementById("btnPendientes").onclick = function() { mostrarPendientes(); };
+            document.getElementById("btnBuscar").onclick = function() { buscarAlumno(); };
+            document.getElementById("btnCerrar").onclick = function() { cerrarScanner(); };
+    
+            menuPrincipal();
     </script>
+
 </body>
 </html>
