@@ -576,7 +576,7 @@
     async function cargarBiblioteca() {
         let html = `
             <div class="card">
-                <div class="flex"><h2>📖 Biblioteca</h2><button id="btnNuevoLibro" class="success">➕ Nuevo Libro</button><button id="btnEscanearISBN" class="secondary">📷 Escanear ISBN</button></div>
+                <div class="flex"><h2>📖 Biblioteca</h2><button id="btnNuevoLibro" class="success">➕ Añadir Libro (escanear)</button></div>
                 <div class="search-filters">
                     <div class="form-grid">
                         <div><label>🔍 Buscar</label><input type="text" id="searchLibroInput" placeholder="Título, signatura o código..."></div>
@@ -596,8 +596,7 @@
         `;
         document.getElementById('mainPanel').innerHTML = html;
         
-        document.getElementById('btnNuevoLibro').onclick = () => mostrarFormularioLibro();
-        document.getElementById('btnEscanearISBN').onclick = () => abrirScannerISBN();
+        document.getElementById('btnNuevoLibro').onclick = () => { modoActual = "escanear_libro"; abrirScanner(); };
         document.getElementById('btnBuscarLibro').onclick = () => buscarLibros();
         document.getElementById('btnLimpiarLibro').onclick = limpiarFiltrosLibros;
         
@@ -605,7 +604,49 @@
             if(e.key === 'Enter') buscarLibros();
         });
     }
-    
+    async function procesarNuevoLibroConEscanner(codigo) {
+        const titulo = prompt("📖 Título del libro:");
+        if (!titulo) return;
+        
+        const materia = prompt("📚 Materia (Ej: Matemáticas):");
+        if (!materia) return;
+        
+        const curso = prompt("🎓 Curso (1ESO, 2ESO, 3ESO, 4ESO, 1BAC, 2BAC):");
+        
+        const editorial = prompt("🏢 Editorial:");
+        
+        const estado = prompt("📌 Estado (nuevo/usado/desgastado):", "nuevo");
+        
+        const origen = prompt("🏷️ Origen (IES/AMPA/Donado):", "IES");
+        
+        const anioCompra = prompt("📅 Año compra (Ej: 2024):", "2024");
+        
+        const signatura = prompt("🔢 Signatura (formato XXX-XXX-XXX):");
+        
+        if (!titulo || !materia) {
+            alert("Título y materia son obligatorios");
+            return;
+        }
+        
+        const { error } = await supabase.from('libros').insert({
+            codigo_barras: codigo,
+            titulo: titulo,
+            materia: materia,
+            curso_para: curso,
+            editorial: editorial,
+            estado: estado,
+            origen: origen,
+            fecha_compra: anioCompra ? `${anioCompra}-01-01` : null,
+            signatura: signatura
+        });
+        
+        if (error) {
+            alert("Error al guardar: " + error.message);
+        } else {
+            alert(`✅ Libro "${titulo}" añadido correctamente`);
+            buscarLibros();
+        }
+    }    
     function limpiarFiltrosLibros() {
         document.getElementById('searchLibroInput').value = '';
         document.getElementById('filtroMateria').value = '';
@@ -885,17 +926,54 @@
     
     async function procesarEscaneo(codigo) {
         if (modoActual === "prestamo_rapido") {
-            // Escaneo de alumno
+            // Escaneo de alumno (por código de usuario)
             const { data: alumno } = await supabase.from('alumnos').select('*').eq('codigo_usuario', parseInt(codigo)).maybeSingle();
             if(alumno) {
                 window.editarAlumno(alumno.id);
                 alert(`Alumno: ${alumno.nombre}`);
             } else {
-                alert('Código no reconocido');
+                alert('Código de alumno no reconocido');
             }
         }
-        else if (modoActual === "escanear_isbn") {
-            await procesarISBN(codigo);
+        else if (modoActual === "escanear_libro") {
+            // Escaneo para añadir nuevo libro
+            await procesarNuevoLibroConEscanner(codigo);
+        }
+        else if (modoActual === "prestar_libro") {
+            // Escaneo para prestar libro a un alumno
+            const { data: libro } = await supabase.from('libros').select('*').eq('codigo_barras', codigo).maybeSingle();
+            if(!libro) {
+                const crear = confirm("Libro no encontrado. ¿Quieres crearlo ahora?");
+                if(crear) {
+                    await procesarNuevoLibroConEscanner(codigo);
+                    const { data: nuevoLibro } = await supabase.from('libros').select('*').eq('codigo_barras', codigo).single();
+                    if(nuevoLibro && currentEditingAlumnoId) {
+                        await supabase.from('prestamos').insert({
+                            libro_codigo: codigo,
+                            alumno_id: currentEditingAlumnoId,
+                            fecha_prestamo: new Date().toISOString().slice(0,10),
+                            ano_academico_id: currentAnoId,
+                            entregado: false
+                        });
+                        alert("✅ Libro creado y prestado correctamente");
+                        window.editarAlumno(currentEditingAlumnoId);
+                    }
+                }
+            } else {
+                const { error } = await supabase.from('prestamos').insert({
+                    libro_codigo: libro.codigo_barras,
+                    alumno_id: currentEditingAlumnoId,
+                    fecha_prestamo: new Date().toISOString().slice(0,10),
+                    ano_academico_id: currentAnoId,
+                    entregado: false
+                });
+                if(error) {
+                    alert('Error al prestar: ' + error.message);
+                } else {
+                    alert(`✅ Libro "${libro.titulo}" prestado correctamente`);
+                    window.editarAlumno(currentEditingAlumnoId);
+                }
+            }
         }
         modoActual = "";
     }
