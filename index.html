@@ -1226,10 +1226,14 @@
                 btnEscanearDevo.onclick = function() { modoActual = "devolucion_libro"; abrirScanner(); };
             }
         } else if (todosDevueltos && devolucionLibros.length > 0) {
-            document.getElementById('btnFinalizarDevolucion')?.onclick = () => {
+
+            const btnFinalizar = document.getElementById('btnFinalizarDevolucion');
+            if (btnFinalizar) {
+                btnFinalizar.onclick = function() {                
                 devolucionAlumno = null;
                 mostrarRecogerLibro();
             };
+        }        
         } else if (devolucionLibros.length === 0) {
             document.getElementById('btnCerrarDevolucion')?.onclick = () => {
                 devolucionAlumno = null;
