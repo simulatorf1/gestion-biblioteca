@@ -524,4 +524,25 @@
     
     async function procesarEscaneo(codigo) {
         if (modoActual === "prestamo_rapido") {
-            const { data: alumno } = await supabase.from('alumnos').
+            const { data: alumno } = await supabase.from('alumnos').select('*').eq('codigo_usuario', parseInt(codigo)).maybeSingle();
+            if(alumno) {
+                window.editarAlumno(alumno.id);
+                alert(`Alumno: ${alumno.nombre}`);
+            } else {
+                alert('Código no reconocido');
+            }
+        }
+        modoActual = "";
+    }
+    
+    // ==================== INFORMES ====================
+    async function cargarInformes() {
+        let html = `<div class="card"><h2>📊 Informes</h2><p>Próximamente: exportación a Excel, filtros avanzados, etc.</p></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+    }
+    
+    init();
+})();
+</script>
+</body>
+</html>
