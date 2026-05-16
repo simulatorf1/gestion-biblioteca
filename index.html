@@ -796,22 +796,14 @@
                 <div><label>Editorial</label><input id="nuevaEditorial"></div>
                 <div><label>Estado</label><select id="nuevoEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
                 <div><label>Origen</label><select id="nuevoOrigen"><option>IES</option><option>AMPA</option><option>Donado</option></select></div>
-                <div><label>Fecha compra</label><input type="date" id="nuevaFechaCompra" value="${new Date().toISOString().slice(0,10)}"></div>
-                <div><label>Signatura (automática)</label><input id="nuevaSignaturaPreview" value="${document.getElementById('nuevaMateria')?.value || 'MAT'}-${document.getElementById('nuevoCurso')?.value || '1'}-${String(nuevoNumero).padStart(3, '0')}" disabled style="background:#f0f0f0;"></div>
+                <div><label>Año compra</label><input type="number" id="nuevaFechaCompra" placeholder="Ej: 2024" value="2024" style="width:100%;"></div>
+                <div><label>Signatura (solo números)</label><input id="nuevaSignatura" placeholder="Ej: 12345"></div>
             </div>
             <div class="flex"><button id="crearLibroBtn">Crear</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div>
         </div>`;
         document.getElementById('mainPanel').innerHTML = html;
         
-        // Actualizar signatura automática al cambiar materia o curso
-        const actualizarSignatura = () => {
-            const materia = (document.getElementById('nuevaMateria').value || 'LIB').substring(0, 3).toUpperCase();
-            const curso = document.getElementById('nuevoCurso').value || '1';
-            const preview = document.getElementById('nuevaSignaturaPreview');
-            if(preview) preview.value = `${materia}-${curso}-${String(nuevoNumero).padStart(3, '0')}`;
-        };
-        document.getElementById('nuevaMateria').addEventListener('input', actualizarSignatura);
-        document.getElementById('nuevoCurso').addEventListener('change', actualizarSignatura);
+
         
         document.getElementById('crearLibroBtn').onclick = async () => {
             const titulo = document.getElementById('nuevoTitulo').value.trim();
@@ -822,7 +814,7 @@
             }
             
             const curso = document.getElementById('nuevoCurso').value;
-            const signaturaPreview = document.getElementById('nuevaSignaturaPreview').value;
+
             
             const { error } = await supabase.from('libros').insert({
                 codigo_barras: Date.now().toString(),
@@ -833,7 +825,7 @@
                 estado: document.getElementById('nuevoEstado').value,
                 origen: document.getElementById('nuevoOrigen').value,
                 fecha_compra: document.getElementById('nuevaFechaCompra').value,
-                signatura: signaturaPreview
+                signatura: document.getElementById('nuevaSignatura').value,
             });
             if(error) alert('Error: ' + error.message);
             else alert('Libro creado');
