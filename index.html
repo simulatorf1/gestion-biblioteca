@@ -1391,8 +1391,260 @@
     
     // ==================== INFORMES ====================
     async function cargarInformes() {
-        let html = `<div class="card"><h2>📊 Informes</h2><p>Próximamente: exportación a Excel, filtros avanzados, etc.</p></div>`;
+        let html = `
+            <div class="card">
+                <h2>📊 Panel de Control</h2>
+                <div class="search-filters">
+                    <div class="form-grid">
+                        <div><label>Filtrar por curso</label><select id="filtroCursoInforme"><option value="">Todos</option><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
+                        <div><label>Filtrar por grupo</label><input type="text" id="filtroGrupoInforme" placeholder="Ej: A, B, C"></div>
+                    </div>
+                    <button id="btnActualizarInformes" class="success">Actualizar</button>
+                </div>
+                <div id="informesTarjetas" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 20px;">
+                    <div class="card" style="text-align:center;"><h3>Cargando...</h3></div>
+                </div>
+            </div>
+            <div class="card">
+                <h3>📋 Listados rápidos</h3>
+                <div class="flex">
+                    <button id="btnListaAlumnosBecados">🎓 Alumnos becados</button>
+                    <button id="btnListaSociosPendientes">💰 Socios con pago pendiente</button>
+                    <button id="btnListaPrestamosActivos">📚 Préstamos activos</button>
+                    <button id="btnListaDonantes">📖 Alumnos donantes</button>
+                    <button id="btnListaProblemas">⚠️ Alumnos con observaciones</button>
+                </div>
+                <div id="listaInformesResultados" style="margin-top: 20px; max-height: 400px; overflow-y: auto;">
+                    <p style="color:#64748b;">Selecciona un listado para ver detalles</p>
+                </div>
+            </div>
+        `;
         document.getElementById('mainPanel').innerHTML = html;
+        
+        document.getElementById('btnActualizarInformes').onclick = () => cargarEstadisticas();
+        document.getElementById('btnListaAlumnosBecados').onclick = () => listarAlumnosBecados();
+        document.getElementById('btnListaSociosPendientes').onclick = () => listarSociosPendientes();
+        document.getElementById('btnListaPrestamosActivos').onclick = () => listarPrestamosActivosInforme();
+        document.getElementById('btnListaDonantes').onclick = () => listarDonantes();
+        document.getElementById('btnListaProblemas').onclick = () => listarAlumnosProblemas();
+        
+        cargarEstadisticas();
+    }
+    
+    async function cargarEstadisticas() {
+        const curso = document.getElementById('filtroCursoInforme').value;
+        const grupo = document.getElementById('filtroGrupoInforme').value;
+        
+        // Construir filtros para consultas
+        let filtroAlumnos = `eq(ano_academico_id,${currentAnoId})`;
+        if (curso) filtroAlumnos += `&eq(curso,${curso})`;
+        if (grupo) filtroAlumnos += `&eq(grupo,${grupo})`;
+        
+        // 1. Total alumnos activos este año
+        const { count: totalAlumnos } = await supabase
+            .from('historial_alumnos')
+            .select('*', { count: 'exact', head: true })
+            .eq('ano_academico_id', currentAnoId)
+            .eq('activo', true);
+        
+        // 2. Alumnos becados
+        let queryBecados = supabase
+            .from('historial_alumnos')
+            .select('*', { count: 'exact', head: true })
+            .eq('ano_academico_id', currentAnoId)
+            .eq('beca', true);
+        if (curso) queryBecados = queryBecados.eq('curso', curso);
+        const { count: alumnosBecados } = await queryBecados;
+        
+        // 3. Alumnos bilingües
+        let queryBilingue = supabase
+            .from('historial_alumnos')
+            .select('*', { count: 'exact', head: true })
+            .eq('ano_academico_id', currentAnoId)
+            .eq('bilingue', true);
+        if (curso) queryBilingue = queryBilingue.eq('curso', curso);
+        const { count: alumnosBilingues } = await queryBilingue;
+        
+        // 4. Socios AMPA
+        const { count: totalSocios } = await supabase
+            .from('socios')
+            .select('*', { count: 'exact', head: true })
+            .eq('ano_academico_id', currentAnoId)
+            .eq('activo', true);
+        
+        // 5. Socios con pago pendiente
+        const { count: sociosPendientes } = await supabase
+            .from('socios')
+            .select('*', { count: 'exact', head: true })
+            .eq('ano_academico_id', currentAnoId)
+            .eq('pagado', false)
+            .eq('activo', true);
+        
+        // 6. Total libros en biblioteca
+        const { count: totalLibros } = await supabase
+            .from('libros')
+            .select('*', { count: 'exact', head: true });
+        
+        // 7. Préstamos activos (no devueltos)
+        const { count: prestamosActivos } = await supabase
+            .from('prestamos')
+            .select('*', { count: 'exact', head: true })
+            .eq('entregado', false);
+        
+        // 8. Alumnos donantes
+        let queryDonantes = supabase
+            .from('historial_alumnos')
+            .select('*', { count: 'exact', head: true })
+            .eq('ano_academico_id', currentAnoId)
+            .eq('donante', true);
+        if (curso) queryDonantes = queryDonantes.eq('curso', curso);
+        const { count: alumnosDonantes } = await queryDonantes;
+        
+        // 9. Alumnos con observaciones (problemas)
+        let queryProblemas = supabase
+            .from('historial_alumnos')
+            .select('*', { count: 'exact', head: true })
+            .eq('ano_academico_id', currentAnoId)
+            .not('observaciones', 'is', null)
+            .neq('observaciones', '');
+        if (curso) queryProblemas = queryProblemas.eq('curso', curso);
+        const { count: alumnosProblemas } = await queryProblemas;
+        
+        // 10. Libros por estado
+        const { data: librosEstado } = await supabase
+            .from('libros')
+            .select('estado, count')
+            .select('estado');
+        
+        let html = `
+            <div class="card" style="text-align:center; background:#eff6ff;">
+                <h3>📊 Estadísticas ${curso ? '· Curso: ' + curso : ''}${grupo ? '· Grupo: ' + grupo : ''}</h3>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+                <div class="card" style="text-align:center;"><h3>👨‍🎓 ${totalAlumnos || 0}</h3><p>Alumnos activos</p></div>
+                <div class="card" style="text-align:center;"><h3>🎓 ${alumnosBecados || 0}</h3><p>Becados</p></div>
+                <div class="card" style="text-align:center;"><h3>🌍 ${alumnosBilingues || 0}</h3><p>Bilingües</p></div>
+                <div class="card" style="text-align:center;"><h3>💰 ${totalSocios || 0}</h3><p>Socios AMPA</p></div>
+                <div class="card" style="text-align:center;"><h3>⏳ ${sociosPendientes || 0}</h3><p>Socios pendientes pago</p></div>
+                <div class="card" style="text-align:center;"><h3>📖 ${totalLibros || 0}</h3><p>Libros en biblioteca</p></div>
+                <div class="card" style="text-align:center;"><h3>🔄 ${prestamosActivos || 0}</h3><p>Préstamos activos</p></div>
+                <div class="card" style="text-align:center;"><h3>📦 ${alumnosDonantes || 0}</h3><p>Donantes</p></div>
+                <div class="card" style="text-align:center;"><h3>⚠️ ${alumnosProblemas || 0}</h3><p>Con observaciones</p></div>
+            </div>
+        `;
+        
+        document.getElementById('informesTarjetas').innerHTML = html;
+    }
+    
+    async function listarAlumnosBecados() {
+        const container = document.getElementById('listaInformesResultados');
+        container.innerHTML = '<p>Cargando...</p>';
+        
+        const { data: alumnos } = await supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', currentAnoId)
+            .eq('beca', true);
+        
+        if (!alumnos || alumnos.length === 0) {
+            container.innerHTML = '<p>No hay alumnos becados</p>';
+            return;
+        }
+        
+        let html = `<h3>🎓 Alumnos becados (${alumnos.length})</h3>`;
+        for (const a of alumnos) {
+            html += `<div class="alumno-row"><div class="alumno-info"><strong>${a.alumnos.nombre}</strong><br>Curso: ${a.curso} ${a.grupo || ''}</div></div>`;
+        }
+        container.innerHTML = html;
+    }
+    
+    async function listarSociosPendientes() {
+        const container = document.getElementById('listaInformesResultados');
+        container.innerHTML = '<p>Cargando...</p>';
+        
+        const { data: socios } = await supabase
+            .from('socios')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', currentAnoId)
+            .eq('pagado', false)
+            .eq('activo', true);
+        
+        if (!socios || socios.length === 0) {
+            container.innerHTML = '<p>No hay socios con pago pendiente</p>';
+            return;
+        }
+        
+        let html = `<h3>💰 Socios con pago pendiente (${socios.length})</h3>`;
+        for (const s of socios) {
+            html += `<div class="alumno-row"><div class="alumno-info"><strong>${s.alumnos.nombre}</strong><br>Nº Socio: ${s.n_socio}</div></div>`;
+        }
+        container.innerHTML = html;
+    }
+    
+    async function listarPrestamosActivosInforme() {
+        const container = document.getElementById('listaInformesResultados');
+        container.innerHTML = '<p>Cargando...</p>';
+        
+        const { data: prestamos } = await supabase
+            .from('prestamos_activos')
+            .select('*')
+            .limit(50);
+        
+        if (!prestamos || prestamos.length === 0) {
+            container.innerHTML = '<p>No hay préstamos activos</p>';
+            return;
+        }
+        
+        let html = `<h3>📚 Préstamos activos (${prestamos.length})</h3>`;
+        for (const p of prestamos) {
+            html += `<div class="alumno-row"><div class="alumno-info"><strong>📖 ${p.libro}</strong><br>👤 ${p.alumno} (${p.curso || '-'})</div></div>`;
+        }
+        container.innerHTML = html;
+    }
+    
+    async function listarDonantes() {
+        const container = document.getElementById('listaInformesResultados');
+        container.innerHTML = '<p>Cargando...</p>';
+        
+        const { data: alumnos } = await supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', currentAnoId)
+            .eq('donante', true);
+        
+        if (!alumnos || alumnos.length === 0) {
+            container.innerHTML = '<p>No hay alumnos donantes</p>';
+            return;
+        }
+        
+        let html = `<h3>📦 Alumnos donantes (${alumnos.length})</h3>`;
+        for (const a of alumnos) {
+            html += `<div class="alumno-row"><div class="alumno-info"><strong>${a.alumnos.nombre}</strong><br>Curso: ${a.curso} ${a.grupo || ''}</div></div>`;
+        }
+        container.innerHTML = html;
+    }
+    
+    async function listarAlumnosProblemas() {
+        const container = document.getElementById('listaInformesResultados');
+        container.innerHTML = '<p>Cargando...</p>';
+        
+        const { data: alumnos } = await supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', currentAnoId)
+            .not('observaciones', 'is', null)
+            .neq('observaciones', '');
+        
+        if (!alumnos || alumnos.length === 0) {
+            container.innerHTML = '<p>No hay alumnos con observaciones</p>';
+            return;
+        }
+        
+        let html = `<h3>⚠️ Alumnos con observaciones (${alumnos.length})</h3>`;
+        for (const a of alumnos) {
+            html += `<div class="alumno-row"><div class="alumno-info"><strong>${a.alumnos.nombre}</strong><br>📝 ${a.observaciones.substring(0, 100)}${a.observaciones.length > 100 ? '...' : ''}</div></div>`;
+        }
+        container.innerHTML = html;
     }
     window.registrarPagoSocio = registrarPagoSocio;
     window.editarPagoSocio = editarPagoSocio;
