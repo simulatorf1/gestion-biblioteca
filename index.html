@@ -718,7 +718,7 @@
         
         const resultadosDiv = document.getElementById('resultadosLibros');
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
-        
+        console.log("Filtros aplicados:", { searchTerm, materia, curso, editorial, estado, origen });
         let query = supabase.from('libros').select('*');
         
         if (searchTerm) {
