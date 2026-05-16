@@ -34,6 +34,7 @@
         #qr-reader { width: 100%; margin-top: 60px; }
         .flex { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
         .resultados { max-height: 500px; overflow-y: auto; }
+        .tachado { text-decoration: line-through; opacity: 0.6; }
     </style>
 </head>
 <body>
@@ -909,9 +910,348 @@
     
     // ==================== PRÉSTAMOS RÁPIDO ====================
     async function cargarPrestamosRapido() {
-        let html = `<div class="card"><h2>🔄 Préstamos Rápidos</h2><button id="btnEscanearPrestamo">📷 Escanear Código de Alumno</button><div id="resultadoEscaneo"></div></div>`;
+        let html = `
+            <div class="card">
+                <h2>🔄 Gestión de Préstamos</h2>
+                <div class="flex">
+                    <button id="btnDarPrestamo" class="success">📤 Dar préstamo (lote)</button>
+                    <button id="btnRecogerLibro" class="warning">📥 Recoger libro (devolución)</button>
+                </div>
+                <div id="subpanelPrestamos"></div>
+            </div>
+        `;
         document.getElementById('mainPanel').innerHTML = html;
-        document.getElementById('btnEscanearPrestamo').onclick = () => { modoActual = "prestamo_rapido"; abrirScanner(); };
+        
+        document.getElementById('btnDarPrestamo').onclick = () => mostrarDarPrestamo();
+        document.getElementById('btnRecogerLibro').onclick = () => mostrarRecogerLibro();
+    }
+
+    // ==================== DAR PRÉSTAMO (LOTE CON ESCÁNER) ====================
+    let loteTemporalPrestamo = [];
+    let alumnoSeleccionado = null;
+    
+    async function mostrarDarPrestamo() {
+        loteTemporalPrestamo = [];
+        alumnoSeleccionado = null;
+        
+        let html = `
+            <div style="margin-top:20px;">
+                <h3>📤 Dar préstamo a un alumno</h3>
+                <div class="search-filters">
+                    <input type="text" id="buscarAlumnoPrestamo" placeholder="Buscar alumno por nombre o código..." style="width:100%;">
+                    <button id="btnBuscarAlumnoPrestamo">Buscar alumno</button>
+                </div>
+                <div id="resultadoAlumno" style="margin-top:10px;"></div>
+                <div id="loteLibrosPrestamo" style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
+                    <h4>📚 Libros a prestar (${loteTemporalPrestamo.length})</h4>
+                    <div id="listaPrestamoLote"></div>
+                    <button id="btnEscanearLibroPrestamo" class="success" disabled>📷 Escanear libro</button>
+                    <button id="btnGuardarPrestamo" class="success" disabled>💾 Guardar préstamo (${loteTemporalPrestamo.length} libros)</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('subpanelPrestamos').innerHTML = html;
+        
+        document.getElementById('btnBuscarAlumnoPrestamo').onclick = () => buscarAlumnoParaPrestamo();
+        document.getElementById('btnEscanearLibroPrestamo').onclick = () => { modoActual = "prestar_libro_lote"; abrirScanner(); };
+        document.getElementById('btnGuardarPrestamo').onclick = () => guardarPrestamoLote();
+        document.getElementById('buscarAlumnoPrestamo').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') buscarAlumnoParaPrestamo();
+        });
+        
+        actualizarListaLotePrestamo();
+    }
+    
+    async function buscarAlumnoParaPrestamo() {
+        const searchTerm = document.getElementById('buscarAlumnoPrestamo').value.trim();
+        const resultadoDiv = document.getElementById('resultadoAlumno');
+        
+        if (!searchTerm) {
+            resultadoDiv.innerHTML = '<p>Escribe un nombre o código</p>';
+            return;
+        }
+        
+        let query = supabase.from('alumnos').select('*, historial_alumnos!inner(*)').eq('historial_alumnos.ano_academico_id', currentAnoId);
+        
+        if (!isNaN(searchTerm)) {
+            query = query.eq('codigo_usuario', parseInt(searchTerm));
+        } else {
+            query = query.ilike('nombre', `%${searchTerm}%`);
+        }
+        
+        const { data: alumnos } = await query;
+        
+        if (!alumnos || alumnos.length === 0) {
+            resultadoDiv.innerHTML = '<p>No se encontró el alumno</p>';
+            return;
+        }
+        
+        const alumno = alumnos[0];
+        alumnoSeleccionado = alumno;
+        
+        // Obtener datos del historial actual
+        const { data: historial } = await supabase
+            .from('historial_alumnos')
+            .select('*')
+            .eq('alumno_id', alumno.id)
+            .eq('ano_academico_id', currentAnoId)
+            .single();
+        
+        resultadoDiv.innerHTML = `
+            <div class="alumno-row">
+                <div class="alumno-info">
+                    <strong>✅ Alumno seleccionado: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                    📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
+                    ${historial?.beca ? '🎓 Becado | ' : ''}${historial?.socio_ampa ? '💰 Socio AMPA' : ''}
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('btnEscanearLibroPrestamo').disabled = false;
+        document.getElementById('btnGuardarPrestamo').disabled = false;
+    }
+    
+    function actualizarListaLotePrestamo() {
+        const container = document.getElementById('listaPrestamoLote');
+        if (!container) return;
+        
+        if (loteTemporalPrestamo.length === 0) {
+            container.innerHTML = '<p>No hay libros escaneados aún</p>';
+        } else {
+            let html = '';
+            loteTemporalPrestamo.forEach((libro, index) => {
+                html += `<div class="alumno-row" style="background:#fef3c7;">
+                    <div class="alumno-info">
+                        📖 <strong>${libro.titulo}</strong><br>
+                        Signatura: ${libro.signatura || '-'} | Código: ${libro.codigo_barras}
+                    </div>
+                    <button onclick="eliminarDelLote(${index})">❌ Quitar</button>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+        const btnGuardar = document.getElementById('btnGuardarPrestamo');
+        if (btnGuardar) {
+            btnGuardar.innerHTML = `💾 Guardar préstamo (${loteTemporalPrestamo.length} libros)`;
+        }
+    }
+    
+    window.eliminarDelLote = (index) => {
+        loteTemporalPrestamo.splice(index, 1);
+        actualizarListaLotePrestamo();
+    };
+    
+    async function procesarLibroParaLote(codigo) {
+        const { data: libro } = await supabase.from('libros').select('*').eq('codigo_barras', codigo).maybeSingle();
+        
+        if (!libro) {
+            const crear = confirm("Libro no encontrado. ¿Quieres crearlo ahora?");
+            if (crear) {
+                await procesarNuevoLibroConEscanner(codigo);
+                const { data: nuevoLibro } = await supabase.from('libros').select('*').eq('codigo_barras', codigo).single();
+                if (nuevoLibro) {
+                    loteTemporalPrestamo.push(nuevoLibro);
+                    alert(`✅ Libro "${nuevoLibro.titulo}" añadido al lote`);
+                    actualizarListaLotePrestamo();
+                }
+            }
+        } else {
+            // Verificar si el libro ya está prestado
+            const { data: prestado } = await supabase
+                .from('prestamos')
+                .select('id')
+                .eq('libro_codigo', libro.codigo_barras)
+                .eq('entregado', false)
+                .maybeSingle();
+            
+            if (prestado) {
+                alert(`⚠️ El libro "${libro.titulo}" ya está prestado a otro alumno`);
+            } else {
+                loteTemporalPrestamo.push(libro);
+                alert(`📚 Añadido: ${libro.titulo} (Total: ${loteTemporalPrestamo.length})`);
+                actualizarListaLotePrestamo();
+            }
+        }
+    }
+    
+    async function guardarPrestamoLote() {
+        if (!alumnoSeleccionado) {
+            alert("Primero selecciona un alumno");
+            return;
+        }
+        
+        if (loteTemporalPrestamo.length === 0) {
+            alert("No hay libros para prestar");
+            return;
+        }
+        
+        let exitos = 0;
+        for (const libro of loteTemporalPrestamo) {
+            const { error } = await supabase.from('prestamos').insert({
+                libro_codigo: libro.codigo_barras,
+                alumno_id: alumnoSeleccionado.id,
+                fecha_prestamo: new Date().toISOString().slice(0,10),
+                ano_academico_id: currentAnoId,
+                entregado: false
+            });
+            if (!error) exitos++;
+        }
+        
+        alert(`✅ ${exitos} libros prestados a ${alumnoSeleccionado.nombre}`);
+        loteTemporalPrestamo = [];
+        alumnoSeleccionado = null;
+        mostrarDarPrestamo();
+    }
+    
+    // ==================== RECOGER LIBRO (DEVOLUCIÓN CON ESCÁNER) ====================
+    let devolucionAlumno = null;
+    let devolucionLibros = [];
+    
+    async function mostrarRecogerLibro() {
+        devolucionAlumno = null;
+        devolucionLibros = [];
+        
+        let html = `
+            <div style="margin-top:20px;">
+                <h3>📥 Recoger libros (devolución)</h3>
+                <div class="search-filters">
+                    <input type="text" id="buscarAlumnoDevolucion" placeholder="Buscar alumno por nombre o código..." style="width:100%;">
+                    <button id="btnBuscarAlumnoDevolucion">Buscar alumno</button>
+                </div>
+                <div id="resultadoAlumnoDevo" style="margin-top:10px;"></div>
+                <div id="devolucionLibrosLista" style="margin-top:20px;"></div>
+            </div>
+        `;
+        document.getElementById('subpanelPrestamos').innerHTML = html;
+        
+        document.getElementById('btnBuscarAlumnoDevolucion').onclick = () => buscarAlumnoParaDevolucion();
+        document.getElementById('buscarAlumnoDevolucion').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') buscarAlumnoParaDevolucion();
+        });
+    }
+    
+    async function buscarAlumnoParaDevolucion() {
+        const searchTerm = document.getElementById('buscarAlumnoDevolucion').value.trim();
+        const resultadoDiv = document.getElementById('resultadoAlumnoDevo');
+        
+        if (!searchTerm) {
+            resultadoDiv.innerHTML = '<p>Escribe un nombre o código</p>';
+            return;
+        }
+        
+        let query = supabase.from('alumnos').select('*, historial_alumnos!inner(*)').eq('historial_alumnos.ano_academico_id', currentAnoId);
+        
+        if (!isNaN(searchTerm)) {
+            query = query.eq('codigo_usuario', parseInt(searchTerm));
+        } else {
+            query = query.ilike('nombre', `%${searchTerm}%`);
+        }
+        
+        const { data: alumnos } = await query;
+        
+        if (!alumnos || alumnos.length === 0) {
+            resultadoDiv.innerHTML = '<p>No se encontró el alumno</p>';
+            return;
+        }
+        
+        devolucionAlumno = alumnos[0];
+        
+        // Obtener libros prestados actualmente
+        const { data: prestamos } = await supabase
+            .from('prestamos')
+            .select('*, libros(*)')
+            .eq('alumno_id', devolucionAlumno.id)
+            .eq('entregado', false)
+            .eq('ano_academico_id', currentAnoId);
+        
+        devolucionLibros = prestamos.map(p => ({
+            id: p.id,
+            codigo: p.libros.codigo_barras,
+            titulo: p.libros.titulo,
+            devuelto: false
+        }));
+        
+        const { data: historial } = await supabase
+            .from('historial_alumnos')
+            .select('*')
+            .eq('alumno_id', devolucionAlumno.id)
+            .eq('ano_academico_id', currentAnoId)
+            .single();
+        
+        resultadoDiv.innerHTML = `
+            <div class="alumno-row">
+                <div class="alumno-info">
+                    <strong>✅ Alumno: ${devolucionAlumno.nombre} ${devolucionAlumno.apellidos || ''}</strong><br>
+                    📋 Código: ${devolucionAlumno.codigo_usuario} | Curso: ${historial?.curso || '-'}<br>
+                    📚 Libros prestados: ${devolucionLibros.length}
+                </div>
+            </div>
+        `;
+        
+        mostrarListaDevolucion();
+    }
+    
+    function mostrarListaDevolucion() {
+        const container = document.getElementById('devolucionLibrosLista');
+        const todosDevueltos = devolucionLibros.every(l => l.devuelto);
+        
+        let html = `<h4>📚 Libros a devolver:</h4>`;
+        
+        if (todosDevueltos && devolucionLibros.length > 0) {
+            html += `<div class="card" style="background:#dcfce7;">
+                <p>✅ ¡Todos los libros han sido devueltos!</p>
+                <button id="btnFinalizarDevolucion" class="success">Finalizar</button>
+            </div>`;
+        } else if (devolucionLibros.length === 0) {
+            html += `<p>✅ Este alumno no tiene libros prestados actualmente</p>`;
+            html += `<button id="btnCerrarDevolucion" class="secondary">Cerrar</button>`;
+        } else {
+            html += `<button id="btnEscanearDevolucion" class="success">📷 Escanear libro para devolver</button>`;
+            html += `<div style="margin-top:15px;">`;
+            for (const libro of devolucionLibros) {
+                const clase = libro.devuelto ? 'tachado' : '';
+                html += `<div class="alumno-row ${clase}" style="${libro.devuelto ? 'opacity:0.6;' : ''}">
+                    <div class="alumno-info">📖 ${libro.titulo} ${libro.devuelto ? '✅ DEVUELTO' : '⏳ PENDIENTE'}</div>
+                </div>`;
+            }
+            html += `</div>`;
+        }
+        
+        container.innerHTML = html;
+        
+        if (!todosDevueltos && devolucionLibros.length > 0) {
+            document.getElementById('btnEscanearDevolucion')?.onclick = () => { modoActual = "devolucion_libro"; abrirScanner(); };
+        } else if (todosDevueltos && devolucionLibros.length > 0) {
+            document.getElementById('btnFinalizarDevolucion')?.onclick = () => {
+                devolucionAlumno = null;
+                mostrarRecogerLibro();
+            };
+        } else if (devolucionLibros.length === 0) {
+            document.getElementById('btnCerrarDevolucion')?.onclick = () => {
+                devolucionAlumno = null;
+                mostrarRecogerLibro();
+            };
+        }
+    }
+    
+    async function procesarDevolucionLibro(codigo) {
+        if (!devolucionAlumno) {
+            alert("Primero busca un alumno");
+            return;
+        }
+        
+        const encontrado = devolucionLibros.find(l => l.codigo === codigo);
+        
+        if (encontrado && !encontrado.devuelto) {
+            await supabase.from('prestamos').update({ entregado: true, fecha_devolucion: new Date().toISOString().slice(0,10) }).eq('id', encontrado.id);
+            encontrado.devuelto = true;
+            alert(`✅ Devuelto: ${encontrado.titulo}`);
+            mostrarListaDevolucion();
+        } else if (encontrado && encontrado.devuelto) {
+            alert(`⚠️ "${encontrado.titulo}" ya fue devuelto`);
+        } else {
+            alert(`⚠️ El libro escaneado no está prestado a ${devolucionAlumno.nombre}`);
+        }
     }
     
     // ==================== ESCÁNER ====================
@@ -968,6 +1308,13 @@
                 alert('Código de alumno no reconocido');
             }
         }
+        else if (modoActual === "prestar_libro_lote") {
+            await procesarLibroParaLote(codigo);
+        }
+        else if (modoActual === "devolucion_libro") {
+            await procesarDevolucionLibro(codigo);
+        }
+            
         else if (modoActual === "escanear_libro") {
             // Escaneo para añadir nuevo libro
             await procesarNuevoLibroConEscanner(codigo);
