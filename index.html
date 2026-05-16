@@ -1220,7 +1220,11 @@
         container.innerHTML = html;
         
         if (!todosDevueltos && devolucionLibros.length > 0) {
-            document.getElementById('btnEscanearDevolucion')?.onclick = () => { modoActual = "devolucion_libro"; abrirScanner(); };
+            
+            const btnEscanearDevo = document.getElementById('btnEscanearDevolucion');
+            if (btnEscanearDevo) {
+                btnEscanearDevo.onclick = function() { modoActual = "devolucion_libro"; abrirScanner(); };
+            }
         } else if (todosDevueltos && devolucionLibros.length > 0) {
             document.getElementById('btnFinalizarDevolucion')?.onclick = () => {
                 devolucionAlumno = null;
