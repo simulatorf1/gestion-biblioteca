@@ -744,7 +744,10 @@
         
         let html = `<h3>Resultados (${libros.length})</h3>`;
         
+
         for (const libro of libros) {
+            console.log("Libro:", libro);  // <--- AÑADE ESTA LÍNEA
+            
             // Verificar si está prestado
             const { data: prestamo } = await supabase
                 .from('prestamos')
