@@ -952,12 +952,30 @@
         `;
         document.getElementById('subpanelPrestamos').innerHTML = html;
         
-        document.getElementById('btnBuscarAlumnoPrestamo').onclick = () => buscarAlumnoParaPrestamo();
-        document.getElementById('btnEscanearLibroPrestamo').onclick = () => { modoActual = "prestar_libro_lote"; abrirScanner(); };
-        document.getElementById('btnGuardarPrestamo').onclick = () => guardarPrestamoLote();
-        document.getElementById('buscarAlumnoPrestamo').addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') buscarAlumnoParaPrestamo();
-        });
+        const btnBuscar = document.getElementById('btnBuscarAlumnoPrestamo');
+        if (btnBuscar) {
+            btnBuscar.onclick = function() { buscarAlumnoParaPrestamo(); };
+        }
+        
+        const btnEscanear = document.getElementById('btnEscanearLibroPrestamo');
+        if (btnEscanear) {
+            btnEscanear.onclick = function() { 
+                modoActual = "prestar_libro_lote"; 
+                abrirScanner(); 
+            };
+        }
+        
+        const btnGuardar = document.getElementById('btnGuardarPrestamo');
+        if (btnGuardar) {
+            btnGuardar.onclick = function() { guardarPrestamoLote(); };
+        }
+        
+        const inputBuscar = document.getElementById('buscarAlumnoPrestamo');
+        if (inputBuscar) {
+            inputBuscar.addEventListener('keypress', function(e) {
+                if(e.key === 'Enter') buscarAlumnoParaPrestamo();
+            });
+        }
         
         actualizarListaLotePrestamo();
     }
@@ -1210,7 +1228,7 @@
             html += `<div style="margin-top:15px;">`;
             for (const libro of devolucionLibros) {
                 const clase = libro.devuelto ? 'tachado' : '';
-                html += `<div class="alumno-row ${clase}" style="${libro.devuelto ? 'opacity:0.6;' : ''}">
+                html += `<div class="alumno-row ${clase}">
                     <div class="alumno-info">📖 ${libro.titulo} ${libro.devuelto ? '✅ DEVUELTO' : '⏳ PENDIENTE'}</div>
                 </div>`;
             }
@@ -1219,23 +1237,28 @@
         
         container.innerHTML = html;
         
-        if (!todosDevueltos && devolucionLibros.length > 0) {
-            
-            const btnEscanearDevo = document.getElementById('btnEscanearDevolucion');
-            if (btnEscanearDevo) {
-                btnEscanearDevo.onclick = function() { modoActual = "devolucion_libro"; abrirScanner(); };
-            }
-        } else if (todosDevueltos && devolucionLibros.length > 0) {
-
-            const btnFinalizar = document.getElementById('btnFinalizarDevolucion');
-            if (btnFinalizar) {
-                btnFinalizar.onclick = function() {                
+        // Escanear libro
+        const btnEscanear = document.getElementById('btnEscanearDevolucion');
+        if (btnEscanear) {
+            btnEscanear.onclick = function() { 
+                modoActual = "devolucion_libro"; 
+                abrirScanner(); 
+            };
+        }
+        
+        // Finalizar devolución
+        const btnFinalizar = document.getElementById('btnFinalizarDevolucion');
+        if (btnFinalizar) {
+            btnFinalizar.onclick = function() {
                 devolucionAlumno = null;
                 mostrarRecogerLibro();
             };
-        }        
-        } else if (devolucionLibros.length === 0) {
-            document.getElementById('btnCerrarDevolucion')?.onclick = () => {
+        }
+        
+        // Cerrar
+        const btnCerrar = document.getElementById('btnCerrarDevolucion');
+        if (btnCerrar) {
+            btnCerrar.onclick = function() {
                 devolucionAlumno = null;
                 mostrarRecogerLibro();
             };
