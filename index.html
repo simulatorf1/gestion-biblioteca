@@ -377,19 +377,178 @@
     };
     
     // ==================== SOCIOS ====================
+    // ==================== SOCIOS AMPA (MEJORADO) ====================
     async function cargarSocios() {
-        const { data: socios } = await supabase.from('socios').select('*, alumnos(*)').eq('ano_academico_id', currentAnoId);
-        let html = `<div class="card"><h2>💰 Socios AMPA</h2><button id="btnRegistrarPago">➕ Registrar Pago</button><div id="listaSocios"></div></div>`;
+        let html = `
+            <div class="card">
+                <div class="flex"><h2>💰 Socios AMPA</h2><button id="btnRegistrarPago" class="success">➕ Registrar nuevo socio</button></div>
+                <div class="search-filters">
+                    <div class="form-grid">
+                        <div><label>🔍 Buscar socio</label><input type="text" id="searchSocioInput" placeholder="Nombre, apellidos o código de usuario..."></div>
+                    </div>
+                    <button id="btnBuscarSocio">Buscar</button>
+                    <button id="btnLimpiarSocio" class="secondary">Limpiar</button>
+                </div>
+                <div id="resultadosSocios" class="resultados">
+                    <p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar socios</p>
+                </div>
+            </div>
+        `;
         document.getElementById('mainPanel').innerHTML = html;
-        document.getElementById('btnRegistrarPago').onclick = () => registrarPagoSocio();
-        const container = document.getElementById('listaSocios');
-        if (!socios?.length) { container.innerHTML = '<p>No hay socios este año</p>'; return; }
-        let listHtml = '';
-        socios.forEach(s => {
-            listHtml += `<div class="alumno-row"><div><strong>${s.alumnos?.nombre}</strong><br>Nº Socio: ${s.n_socio} | Pagado: ${s.fecha_pago}</div></div>`;
+        
+        document.getElementById('btnRegistrarPago').onclick = () => registrarPagoSocio(null);
+        document.getElementById('btnBuscarSocio').onclick = () => buscarSocios();
+        document.getElementById('btnLimpiarSocio').onclick = () => {
+            document.getElementById('searchSocioInput').value = '';
+            document.getElementById('resultadosSocios').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar socios</p>';
+        };
+        document.getElementById('searchSocioInput').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') buscarSocios();
         });
-        container.innerHTML = listHtml;
     }
+    
+    async function buscarSocios() {
+        const searchTerm = document.getElementById('searchSocioInput').value.trim();
+        const resultadosDiv = document.getElementById('resultadosSocios');
+        
+        if (!searchTerm) {
+            resultadosDiv.innerHTML = '<p style="color:#64748b; text-align:center;">Escribe algo para buscar</p>';
+            return;
+        }
+        
+        resultadosDiv.innerHTML = '<p>Buscando...</p>';
+        
+        // Buscar alumnos por nombre, apellidos o código
+        let query = supabase.from('alumnos').select('*');
+        
+        if (!isNaN(searchTerm) && searchTerm !== '') {
+            query = query.eq('codigo_usuario', parseInt(searchTerm));
+        } else {
+            query = query.or(`nombre.ilike.%${searchTerm}%,apellidos.ilike.%${searchTerm}%`);
+        }
+        
+        const { data: alumnos, error } = await query;
+        
+        if (error) {
+            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            return;
+        }
+        
+        if (!alumnos || alumnos.length === 0) {
+            resultadosDiv.innerHTML = '<p>No se encontraron alumnos</p>';
+            return;
+        }
+        
+        let html = `<h3>Resultados (${alumnos.length})</h3>`;
+        
+        for (const alumno of alumnos) {
+            // Verificar si es socio este año
+            const { data: socio } = await supabase
+                .from('socios')
+                .select('*')
+                .eq('alumno_id', alumno.id)
+                .eq('ano_academico_id', currentAnoId)
+                .maybeSingle();
+            
+            const esSocio = socio && socio.activo !== false;
+            const haPagado = socio?.pagado || false;
+            
+            html += `
+                <div class="alumno-row">
+                    <div class="alumno-info">
+                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                        📋 Código: ${alumno.codigo_usuario || 'Sin código'}<br>
+                        ${esSocio ? (haPagado ? '✅ Socio - Pago registrado' : '⚠️ Socio - Pago pendiente') : '❌ No es socio'}
+                        ${socio ? `<br>📅 Fecha pago: ${socio.fecha_pago || 'No registrada'}` : ''}
+                    </div>
+                    <div class="alumno-actions">
+                        ${!esSocio ? `<button onclick="window.registrarPagoSocio(${alumno.id})">➕ Hacer socio</button>` : ''}
+                        ${esSocio ? `<button onclick="window.editarPagoSocio(${socio.id}, ${alumno.id})">✏️ Editar pago</button>` : ''}
+                        ${esSocio ? `<button class="danger" onclick="window.darBajaSocio(${socio.id}, ${alumno.id})">🗑️ Dar baja socio</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        resultadosDiv.innerHTML = html;
+    }
+    
+    window.registrarPagoSocio = async (alumnoId) => {
+        if (!alumnoId) {
+            // Mostrar selector de alumno
+            const { data: alumnos } = await supabase.from('alumnos').select('*').order('nombre');
+            let options = alumnos.map(a => `<option value="${a.id}">${a.nombre} ${a.apellidos || ''} (Código: ${a.codigo_usuario})</option>`).join('');
+            let html = `<div class="card"><h2>Registrar Nuevo Socio AMPA</h2>
+            <div class="form-grid">
+                <div><label>Alumno</label><select id="socioAlumnoId">${options}</select></div>
+                <div><label>Fecha Pago</label><input type="date" id="socioFechaPago" value="${new Date().toISOString().slice(0,10)}"></div>
+                <div><label><input type="checkbox" id="socioPagado" checked> Pago realizado</label></div>
+            </div>
+            <div class="flex"><button id="confirmarPagoBtn">Guardar</button><button class="secondary" onclick="cargarSocios()">Cancelar</button></div></div>`;
+            document.getElementById('mainPanel').innerHTML = html;
+            document.getElementById('confirmarPagoBtn').onclick = async () => {
+                const idAlumno = parseInt(document.getElementById('socioAlumnoId').value);
+                const fecha = document.getElementById('socioFechaPago').value;
+                const pagado = document.getElementById('socioPagado').checked;
+                const { data: ultimo } = await supabase.from('socios').select('n_socio').order('n_socio', { ascending: false }).limit(1);
+                let nuevoNumero = ultimo?.length ? ultimo[0].n_socio + 1 : 1;
+                await supabase.from('socios').insert({
+                    n_socio: nuevoNumero,
+                    alumno_id: idAlumno,
+                    ano_academico_id: currentAnoId,
+                    fecha_pago: fecha,
+                    pagado: pagado,
+                    activo: true
+                });
+                await supabase.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', idAlumno).eq('ano_academico_id', currentAnoId);
+                alert(`Socio registrado con Nº ${nuevoNumero}`);
+                cargarSocios();
+            };
+            return;
+        }
+        
+        // Si se pasa alumnoId directamente
+        const fecha = new Date().toISOString().slice(0,10);
+        const { data: ultimo } = await supabase.from('socios').select('n_socio').order('n_socio', { ascending: false }).limit(1);
+        let nuevoNumero = ultimo?.length ? ultimo[0].n_socio + 1 : 1;
+        await supabase.from('socios').insert({
+            n_socio: nuevoNumero,
+            alumno_id: alumnoId,
+            ano_academico_id: currentAnoId,
+            fecha_pago: fecha,
+            pagado: true,
+            activo: true
+        });
+        await supabase.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+        alert(`Socio registrado con Nº ${nuevoNumero}`);
+        buscarSocios();
+    };
+    
+    window.editarPagoSocio = async (socioId, alumnoId) => {
+        const { data: socio } = await supabase.from('socios').select('*').eq('id', socioId).single();
+        let html = `<div class="card"><h2>Editar Pago Socio</h2>
+        <div class="form-grid">
+            <div><label>Fecha Pago</label><input type="date" id="editFechaPago" value="${socio.fecha_pago || ''}"></div>
+            <div><label><input type="checkbox" id="editPagado" ${socio.pagado ? 'checked' : ''}> Pago realizado</label></div>
+        </div>
+        <div class="flex"><button id="guardarPagoBtn">Guardar</button><button class="secondary" onclick="cargarSocios()">Cancelar</button></div></div>`;
+        document.getElementById('mainPanel').innerHTML = html;
+        document.getElementById('guardarPagoBtn').onclick = async () => {
+            await supabase.from('socios').update({
+                fecha_pago: document.getElementById('editFechaPago').value,
+                pagado: document.getElementById('editPagado').checked
+            }).eq('id', socioId);
+            alert('Pago actualizado');
+            cargarSocios();
+        };
+    };
+    
+    window.darBajaSocio = async (socioId, alumnoId) => {
+        if(!confirm('¿Dar de baja a este socio? Se conservará el historial.')) return;
+        await supabase.from('socios').update({ activo: false }).eq('id', socioId);
+        await supabase.from('historial_alumnos').update({ socio_ampa: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+        alert('Socio dado de baja');
+        buscarSocios();
+    };
     
     async function registrarPagoSocio() {
         const { data: alumnos } = await supabase.from('alumnos').select('*');
@@ -543,7 +702,9 @@
         let html = `<div class="card"><h2>📊 Informes</h2><p>Próximamente: exportación a Excel, filtros avanzados, etc.</p></div>`;
         document.getElementById('mainPanel').innerHTML = html;
     }
-    
+    window.registrarPagoSocio = registrarPagoSocio;
+    window.editarPagoSocio = editarPagoSocio;
+    window.darBajaSocio = darBajaSocio;    
     init();
 })();
 </script>
