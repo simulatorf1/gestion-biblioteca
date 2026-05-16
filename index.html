@@ -765,7 +765,7 @@
                         🏷️ Origen: ${libro.origen || 'IES'} | ${estadoPrestamo}
                     </div>
                     <div class="alumno-actions">
-                        <button onclick="window.editarLibro(${libro.id})">✏️ Editar</button>
+                        <button onclick="window.editarLibro('${libro.id}')">✏️ Editar</button>
                         ${prestamo ? `<button class="secondary" onclick="window.verPrestamoLibro('${libro.codigo_barras}')">👤 Ver quién lo tiene</button>` : ''}
                     </div>
                 </div>
@@ -790,24 +790,42 @@
     };
     
     window.editarLibro = async (libroId) => {
-        const { data: libro } = await supabase.from('libros').select('*').eq('id', libroId).single();
+        const libroIdNum = parseInt(libroId);
+        if (isNaN(libroIdNum)) {
+            alert("ID de libro inválido");
+            return;
+        }
+        
+        const { data: libro } = await supabase.from('libros').select('*').eq('id', libroIdNum).single();
+        if (!libro) {
+            alert("Libro no encontrado");
+            return;
+        }
+        
         let html = `<div class="card"><h2>Editar Libro</h2><div class="form-grid">
-        <div><label>Título</label><input id="editTitulo" value="${libro.titulo}"></div>
-        <div><label>Materia</label><input id="editMateria" value="${libro.materia || ''}"></div>
-        <div><label>Editorial</label><input id="editEditorial" value="${libro.editorial || ''}"></div>
-        <div><label>Signatura</label><input id="editSignatura" value="${libro.signatura || ''}"></div>
-        <div><label>Estado</label><select id="editEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+            <div><label>Título</label><input id="editTitulo" value="${libro.titulo || ''}"></div>
+            <div><label>Materia</label><input id="editMateria" value="${libro.materia || ''}"></div>
+            <div><label>Editorial</label><input id="editEditorial" value="${libro.editorial || ''}"></div>
+            <div><label>Signatura</label><input id="editSignatura" value="${libro.signatura || ''}"></div>
+            <div><label>Estado</label><select id="editEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+            <div><label>Origen</label><select id="editOrigen"><option>IES</option><option>AMPA</option><option>Donado</option></select></div>
+            <div><label>Año compra</label><input type="number" id="editAnioCompra" value="${libro.fecha_compra ? libro.fecha_compra.slice(0,4) : ''}"></div>
         </div><div class="flex"><button id="guardarLibroBtn">Guardar</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
+        
         document.getElementById('mainPanel').innerHTML = html;
         document.getElementById('editEstado').value = libro.estado || 'nuevo';
+        document.getElementById('editOrigen').value = libro.origen || 'IES';
+        
         document.getElementById('guardarLibroBtn').onclick = async () => {
             await supabase.from('libros').update({
                 titulo: document.getElementById('editTitulo').value,
                 materia: document.getElementById('editMateria').value,
                 editorial: document.getElementById('editEditorial').value,
                 signatura: document.getElementById('editSignatura').value,
-                estado: document.getElementById('editEstado').value
-            }).eq('id', libroId);
+                estado: document.getElementById('editEstado').value,
+                origen: document.getElementById('editOrigen').value,
+                fecha_compra: document.getElementById('editAnioCompra').value ? `${document.getElementById('editAnioCompra').value}-01-01` : null
+            }).eq('id', libroIdNum);
             alert('Libro actualizado');
             cargarBiblioteca();
         };
