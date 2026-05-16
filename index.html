@@ -213,7 +213,10 @@
                 <p>No se encontraron alumnos</p>
                 <button id="btnCrearDesdeBusqueda" class="success">➕ Crear nuevo alumno</button>
             `;
-            document.getElementById('btnCrearDesdeBusqueda')?.onclick = () => editarAlumno(null);
+            const btnCrear = document.getElementById('btnCrearDesdeBusqueda');
+            if (btnCrear) {
+                btnCrear.onclick = function() { editarAlumno(null); };
+            }
             return;
         }
         
