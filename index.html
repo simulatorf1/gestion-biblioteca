@@ -605,6 +605,19 @@
         });
     }
     async function procesarNuevoLibroConEscanner(codigo) {
+        // PRIMERO: comprobar si el libro ya existe
+        const { data: libroExistente } = await supabase
+            .from('libros')
+            .select('titulo')
+            .eq('codigo_barras', codigo)
+            .maybeSingle();
+        
+        if (libroExistente) {
+            alert(`⚠️ El libro "${libroExistente.titulo}" ya está registrado en la biblioteca.`);
+            return;
+        }
+        
+        // Si no existe, continuar con las preguntas
         const titulo = prompt("📖 Título del libro:");
         if (!titulo) return;
         
@@ -621,7 +634,7 @@
         
         const anioCompra = prompt("📅 Año compra (Ej: 2024):", "2024");
         
-        const signatura = prompt("🔢 Signatura (formato XXX-XXX-XXX):");
+        const signatura = prompt("🔢 Signatura:");
         
         if (!titulo || !materia) {
             alert("Título y materia son obligatorios");
@@ -646,7 +659,7 @@
             alert(`✅ Libro "${titulo}" añadido correctamente`);
             buscarLibros();
         }
-    }    
+    }
     function limpiarFiltrosLibros() {
         document.getElementById('searchLibroInput').value = '';
         document.getElementById('filtroMateria').value = '';
