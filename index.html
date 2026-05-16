@@ -270,6 +270,7 @@
                 <div><label>Curso</label><select id="editCurso"><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
                 <div><label>Grupo</label><input id="editGrupo" value="${historialActual?.grupo || ''}"></div>
                 <div><label>Teléfono</label><input id="editTelefono" value="${historialActual?.telefono || ''}"></div>
+                <div><label><input type="checkbox" id="editDiversificacion" ${historialActual?.diversificacion ? 'checked' : ''}> Diversificación</label></div>                
                 <div><label><input type="checkbox" id="editBilingue" ${historialActual?.bilingue ? 'checked' : ''}> Bilingüe</label></div>
                 <div><label><input type="checkbox" id="editBeca" ${historialActual?.beca ? 'checked' : ''}> Beca</label></div>
                 <div><label>Socio AMPA</label><input type="text" id="editSocioDisplay" value="${historialActual?.socio_ampa ? 'Sí' : 'No'}" disabled style="background:#f0f0f0;"></div>
@@ -318,6 +319,7 @@
                 bilingue: document.getElementById('editBilingue').checked,
                 beca: document.getElementById('editBeca').checked,
                 socio_ampa: historialActual?.socio_ampa || false,
+                diversificacion: document.getElementById('editDiversificacion').checked,
                 donante: historialActual?.donante || false,
                 observaciones: document.getElementById('editObservaciones').value,
                 activo: true
@@ -381,7 +383,7 @@
     async function cargarSocios() {
         let html = `
             <div class="card">
-                <div class="flex"><h2>💰 Socios AMPA</h2><button id="btnRegistrarPago" class="success">➕ Registrar nuevo socio</button></div>
+                <div class="flex"><h2>💰 Socios AMPA</h2></div>
                 <div class="search-filters">
                     <div class="form-grid">
                         <div><label>🔍 Buscar socio</label><input type="text" id="searchSocioInput" placeholder="Nombre, apellidos o código de usuario..."></div>
@@ -396,7 +398,7 @@
         `;
         document.getElementById('mainPanel').innerHTML = html;
         
-        document.getElementById('btnRegistrarPago').onclick = () => registrarPagoSocio(null);
+
         document.getElementById('btnBuscarSocio').onclick = () => buscarSocios();
         document.getElementById('btnLimpiarSocio').onclick = () => {
             document.getElementById('searchSocioInput').value = '';
