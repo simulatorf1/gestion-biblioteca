@@ -282,7 +282,7 @@
                 <button id="guardarAlumnoBtn">💾 Guardar</button>
                 ${alumnoId ? '<button id="imprimirAlumnoBtn" class="secondary">🖨️ Imprimir ficha</button>' : ''}
                 ${alumnoId ? '<button id="bajaAlumnoBtn" class="danger">🗑️ Dar de baja</button>' : ''}
-                <button class="secondary" onclick="cargarAlumnos()">Cancelar</button>
+                <button class="secondary" onclick="window.cargarAlumnos()">Cancelar</button>
             </div>
         </div>`;
         document.getElementById('mainPanel').innerHTML = html;
@@ -394,7 +394,7 @@
         let html = `<div class="card"><h2>Registrar Pago AMPA</h2>
         <div class="form-grid"><div><label>Alumno</label><select id="socioAlumnoId">${options}</select></div>
         <div><label>Fecha Pago</label><input type="date" id="socioFechaPago" value="${new Date().toISOString().slice(0,10)}"></div></div>
-        <div class="flex"><button id="confirmarPagoBtn">Guardar</button><button class="secondary" onclick="cargarSocios()">Cancelar</button></div></div>`;
+        <div class="flex"><button id="confirmarPagoBtn">Guardar</button><button class="secondary" onclick="window.cargarSocios()">Cancelar</button></div></div>`;
         document.getElementById('mainPanel').innerHTML = html;
         document.getElementById('confirmarPagoBtn').onclick = async () => {
             const alumnoId = parseInt(document.getElementById('socioAlumnoId').value);
