@@ -574,19 +574,127 @@
     
     // ==================== BIBLIOTECA ====================
     async function cargarBiblioteca() {
-        const { data: libros } = await supabase.from('libros').select('*').order('created_at', { ascending: false });
-        let html = `<div class="card"><h2>📖 Biblioteca</h2><div class="flex"><button id="btnNuevoLibro">➕ Nuevo Libro</button></div><div id="listaBiblioteca"></div></div>`;
+        let html = `
+            <div class="card">
+                <div class="flex"><h2>📖 Biblioteca</h2><button id="btnNuevoLibro" class="success">➕ Nuevo Libro</button></div>
+                <div class="search-filters">
+                    <div class="form-grid">
+                        <div><label>🔍 Buscar</label><input type="text" id="searchLibroInput" placeholder="Título, signatura o código..."></div>
+                        <div><label>Materia</label><input type="text" id="filtroMateria" placeholder="Ej: Matemáticas"></div>
+                        <div><label>Curso</label><select id="filtroCurso"><option value="">Todos</option><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
+                        <div><label>Editorial</label><input type="text" id="filtroEditorial" placeholder="Editorial"></div>
+                        <div><label>Estado</label><select id="filtroEstado"><option value="">Todos</option><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+                        <div><label>Origen</label><select id="filtroOrigen"><option value="">Todos</option><option>AMPA</option><option>IES</option><option>Donado</option></select></div>
+                    </div>
+                    <button id="btnBuscarLibro">Buscar</button>
+                    <button id="btnLimpiarLibro" class="secondary">Limpiar</button>
+                </div>
+                <div id="resultadosLibros" class="resultados">
+                    <p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar libros</p>
+                </div>
+            </div>
+        `;
         document.getElementById('mainPanel').innerHTML = html;
+        
         document.getElementById('btnNuevoLibro').onclick = () => mostrarFormularioLibro();
-        const container = document.getElementById('listaBiblioteca');
-        if (!libros?.length) { container.innerHTML = '<p>No hay libros</p>'; return; }
-        let listHtml = '';
-        libros.forEach(l => {
-            listHtml += `<div class="alumno-row"><div><strong>${l.titulo}</strong><br>Signatura: ${l.signatura || '-'} | Estado: ${l.estado || 'nuevo'}</div>
-            <div><button onclick="window.editarLibro(${l.id})">✏️</button></div></div>`;
+        document.getElementById('btnBuscarLibro').onclick = () => buscarLibros();
+        document.getElementById('btnLimpiarLibro').onclick = limpiarFiltrosLibros;
+        
+        document.getElementById('searchLibroInput').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') buscarLibros();
         });
-        container.innerHTML = listHtml;
     }
+    
+    function limpiarFiltrosLibros() {
+        document.getElementById('searchLibroInput').value = '';
+        document.getElementById('filtroMateria').value = '';
+        document.getElementById('filtroCurso').value = '';
+        document.getElementById('filtroEditorial').value = '';
+        document.getElementById('filtroEstado').value = '';
+        document.getElementById('filtroOrigen').value = '';
+        document.getElementById('resultadosLibros').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar libros</p>';
+    }
+    
+    async function buscarLibros() {
+        const searchTerm = document.getElementById('searchLibroInput').value.trim();
+        const materia = document.getElementById('filtroMateria').value.trim();
+        const curso = document.getElementById('filtroCurso').value;
+        const editorial = document.getElementById('filtroEditorial').value.trim();
+        const estado = document.getElementById('filtroEstado').value;
+        const origen = document.getElementById('filtroOrigen').value;
+        
+        const resultadosDiv = document.getElementById('resultadosLibros');
+        resultadosDiv.innerHTML = '<p>Buscando...</p>';
+        
+        let query = supabase.from('libros').select('*');
+        
+        if (searchTerm) {
+            query = query.or(`titulo.ilike.%${searchTerm}%,signatura.ilike.%${searchTerm}%,codigo_barras.ilike.%${searchTerm}%`);
+        }
+        if (materia) query = query.ilike('materia', `%${materia}%`);
+        if (curso) query = query.eq('curso_para', curso);
+        if (editorial) query = query.ilike('editorial', `%${editorial}%`);
+        if (estado) query = query.eq('estado', estado);
+        if (origen) query = query.eq('origen', origen);
+        
+        const { data: libros, error } = await query.order('created_at', { ascending: false });
+        
+        if (error) {
+            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            return;
+        }
+        
+        if (!libros || libros.length === 0) {
+            resultadosDiv.innerHTML = '<p>No se encontraron libros</p>';
+            return;
+        }
+        
+        let html = `<h3>Resultados (${libros.length})</h3>`;
+        
+        for (const libro of libros) {
+            // Verificar si está prestado
+            const { data: prestamo } = await supabase
+                .from('prestamos')
+                .select('*, alumnos(*)')
+                .eq('libro_codigo', libro.codigo_barras)
+                .eq('entregado', false)
+                .maybeSingle();
+            
+            const estadoPrestamo = prestamo ? `🔴 Prestado a: ${prestamo.alumnos?.nombre}` : '🟢 Disponible';
+            
+            html += `
+                <div class="alumno-row">
+                    <div class="alumno-info">
+                        <strong>${libro.titulo}</strong><br>
+                        📖 Signatura: ${libro.signatura || 'Sin asignar'} | Código: ${libro.codigo_barras}<br>
+                        📚 Materia: ${libro.materia || '-'} | Curso: ${libro.curso_para || '-'}<br>
+                        🏢 Editorial: ${libro.editorial || '-'} | Estado: ${libro.estado || 'nuevo'}<br>
+                        🏷️ Origen: ${libro.origen || 'IES'} | ${estadoPrestamo}
+                    </div>
+                    <div class="alumno-actions">
+                        <button onclick="window.editarLibro(${libro.id})">✏️ Editar</button>
+                        ${prestamo ? `<button class="secondary" onclick="window.verPrestamoLibro('${libro.codigo_barras}')">👤 Ver quién lo tiene</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        resultadosDiv.innerHTML = html;
+    }
+    
+    window.verPrestamoLibro = async (codigoBarras) => {
+        const { data: prestamo } = await supabase
+            .from('prestamos')
+            .select('*, alumnos(*)')
+            .eq('libro_codigo', codigoBarras)
+            .eq('entregado', false)
+            .single();
+        
+        if(prestamo) {
+            alert(`Libro prestado a: ${prestamo.alumnos?.nombre} ${prestamo.alumnos?.apellidos || ''}\nFecha préstamo: ${prestamo.fecha_prestamo}`);
+        } else {
+            alert('El libro no está prestado actualmente');
+        }
+    };
     
     window.editarLibro = async (libroId) => {
         const { data: libro } = await supabase.from('libros').select('*').eq('id', libroId).single();
@@ -613,22 +721,67 @@
     };
     
     async function mostrarFormularioLibro() {
-        let html = `<div class="card"><h2>Nuevo Libro</h2><div class="form-grid">
-        <div><label>Título</label><input id="nuevoTitulo"></div>
-        <div><label>Materia</label><input id="nuevaMateria"></div>
-        <div><label>Editorial</label><input id="nuevaEditorial"></div>
-        <div><label>Signatura</label><input id="nuevaSignatura"></div>
-        <div><label>Estado</label><select id="nuevoEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
-        </div><div class="flex"><button id="crearLibroBtn">Crear</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div></div>`;
+        // Obtener el último número de ejemplar para generar código automático
+        const { data: ultimoLibro } = await supabase
+            .from('libros')
+            .select('signatura')
+            .not('signatura', 'is', null)
+            .order('signatura', { ascending: false })
+            .limit(1);
+        
+        let ultimoNumero = 0;
+        if (ultimoLibro && ultimoLibro[0]?.signatura) {
+            const match = ultimoLibro[0].signatura.match(/(\d+)$/);
+            if (match) ultimoNumero = parseInt(match[1]);
+        }
+        const nuevoNumero = ultimoNumero + 1;
+        
+        let html = `<div class="card"><h2>📖 Nuevo Libro</h2>
+            <div class="form-grid">
+                <div><label>Título *</label><input id="nuevoTitulo"></div>
+                <div><label>Materia *</label><input id="nuevaMateria" placeholder="Ej: Matemáticas"></div>
+                <div><label>Curso *</label><select id="nuevoCurso"><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
+                <div><label>Editorial</label><input id="nuevaEditorial"></div>
+                <div><label>Estado</label><select id="nuevoEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
+                <div><label>Origen</label><select id="nuevoOrigen"><option>IES</option><option>AMPA</option><option>Donado</option></select></div>
+                <div><label>Fecha compra</label><input type="date" id="nuevaFechaCompra" value="${new Date().toISOString().slice(0,10)}"></div>
+                <div><label>Signatura (automática)</label><input id="nuevaSignaturaPreview" value="${document.getElementById('nuevaMateria')?.value || 'MAT'}-${document.getElementById('nuevoCurso')?.value || '1'}-${String(nuevoNumero).padStart(3, '0')}" disabled style="background:#f0f0f0;"></div>
+            </div>
+            <div class="flex"><button id="crearLibroBtn">Crear</button><button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div>
+        </div>`;
         document.getElementById('mainPanel').innerHTML = html;
+        
+        // Actualizar signatura automática al cambiar materia o curso
+        const actualizarSignatura = () => {
+            const materia = (document.getElementById('nuevaMateria').value || 'LIB').substring(0, 3).toUpperCase();
+            const curso = document.getElementById('nuevoCurso').value || '1';
+            const preview = document.getElementById('nuevaSignaturaPreview');
+            if(preview) preview.value = `${materia}-${curso}-${String(nuevoNumero).padStart(3, '0')}`;
+        };
+        document.getElementById('nuevaMateria').addEventListener('input', actualizarSignatura);
+        document.getElementById('nuevoCurso').addEventListener('change', actualizarSignatura);
+        
         document.getElementById('crearLibroBtn').onclick = async () => {
+            const titulo = document.getElementById('nuevoTitulo').value.trim();
+            const materia = document.getElementById('nuevaMateria').value.trim();
+            if (!titulo || !materia) {
+                alert('Título y Materia son obligatorios');
+                return;
+            }
+            
+            const curso = document.getElementById('nuevoCurso').value;
+            const signaturaPreview = document.getElementById('nuevaSignaturaPreview').value;
+            
             const { error } = await supabase.from('libros').insert({
                 codigo_barras: Date.now().toString(),
-                titulo: document.getElementById('nuevoTitulo').value,
-                materia: document.getElementById('nuevaMateria').value,
+                titulo: titulo,
+                materia: materia,
                 editorial: document.getElementById('nuevaEditorial').value,
-                signatura: document.getElementById('nuevaSignatura').value,
-                estado: document.getElementById('nuevoEstado').value
+                curso_para: curso,
+                estado: document.getElementById('nuevoEstado').value,
+                origen: document.getElementById('nuevoOrigen').value,
+                fecha_compra: document.getElementById('nuevaFechaCompra').value,
+                signatura: signaturaPreview
             });
             if(error) alert('Error: ' + error.message);
             else alert('Libro creado');
@@ -706,6 +859,7 @@
     }
     window.registrarPagoSocio = registrarPagoSocio;
     window.editarPagoSocio = editarPagoSocio;
+    window.verPrestamoLibro = verPrestamoLibro;
     window.darBajaSocio = darBajaSocio;    
     init();
 })();
