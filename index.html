@@ -576,7 +576,7 @@
     async function cargarBiblioteca() {
         let html = `
             <div class="card">
-                <div class="flex"><h2>📖 Biblioteca</h2><button id="btnNuevoLibro" class="success">➕ Nuevo Libro</button></div>
+                <div class="flex"><h2>📖 Biblioteca</h2><button id="btnNuevoLibro" class="success">➕ Nuevo Libro</button><button id="btnEscanearISBN" class="secondary">📷 Escanear ISBN</button></div>
                 <div class="search-filters">
                     <div class="form-grid">
                         <div><label>🔍 Buscar</label><input type="text" id="searchLibroInput" placeholder="Título, signatura o código..."></div>
@@ -597,6 +597,7 @@
         document.getElementById('mainPanel').innerHTML = html;
         
         document.getElementById('btnNuevoLibro').onclick = () => mostrarFormularioLibro();
+        document.getElementById('btnEscanearISBN').onclick = () => abrirScannerISBN();
         document.getElementById('btnBuscarLibro').onclick = () => buscarLibros();
         document.getElementById('btnLimpiarLibro').onclick = limpiarFiltrosLibros;
         
@@ -614,6 +615,57 @@
         document.getElementById('filtroOrigen').value = '';
         document.getElementById('resultadosLibros').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar libros</p>';
     }
+
+    async function abrirScannerISBN() {
+        modoActual = "escanear_isbn";
+        abrirScanner();
+    }
+    
+    async function procesarISBN(codigo) {
+        // Aquí puedes llamar a una API para obtener datos del ISBN
+        // Por ahora, rellenamos manualmente
+        const titulo = prompt("ISBN escaneado: " + codigo + "\nIntroduce el título del libro:");
+        if (!titulo) return;
+        
+        const materia = prompt("Materia (Ej: Matemáticas):");
+        if (!materia) return;
+        
+        const curso = prompt("Curso (1ESO, 2ESO, etc.):");
+        
+        // Generar signatura automática
+        const { data: ultimoLibro } = await supabase
+            .from('libros')
+            .select('signatura')
+            .not('signatura', 'is', null)
+            .order('signatura', { ascending: false })
+            .limit(1);
+        
+        let ultimoNumero = 0;
+        if (ultimoLibro && ultimoLibro[0]?.signatura) {
+            const match = ultimoLibro[0].signatura.match(/(\d+)$/);
+            if (match) ultimoNumero = parseInt(match[1]);
+        }
+        const nuevoNumero = ultimoNumero + 1;
+        const signatura = `${materia.substring(0,3).toUpperCase()}-${curso?.substring(0,1) || '1'}-${String(nuevoNumero).padStart(3, '0')}`;
+        
+        const { error } = await supabase.from('libros').insert({
+            codigo_barras: codigo,
+            titulo: titulo,
+            materia: materia,
+            curso_para: curso,
+            signatura: signatura,
+            estado: 'nuevo',
+            origen: 'IES'
+        });
+        
+        if(error) {
+            alert('Error: ' + error.message);
+        } else {
+            alert(`✅ Libro "${titulo}" añadido correctamente\nSignatura: ${signatura}`);
+            buscarLibros();
+        }
+    }    
+    
     
     async function buscarLibros() {
         const searchTerm = document.getElementById('searchLibroInput').value.trim();
@@ -841,6 +893,7 @@
     
     async function procesarEscaneo(codigo) {
         if (modoActual === "prestamo_rapido") {
+            // Escaneo de alumno
             const { data: alumno } = await supabase.from('alumnos').select('*').eq('codigo_usuario', parseInt(codigo)).maybeSingle();
             if(alumno) {
                 window.editarAlumno(alumno.id);
@@ -848,6 +901,9 @@
             } else {
                 alert('Código no reconocido');
             }
+        }
+        else if (modoActual === "escanear_isbn") {
+            await procesarISBN(codigo);
         }
         modoActual = "";
     }
