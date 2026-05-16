@@ -21,16 +21,19 @@
         button.secondary { background: #64748b; }
         button.danger { background: #dc2626; }
         button.success { background: #10b981; }
-        .alumno-row { background: #f8fafc; padding: 16px; margin-bottom: 12px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-left: 4px solid #2563eb; }
+        .alumno-row { background: #f8fafc; padding: 16px; margin-bottom: 12px; border-radius: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; border-left: 4px solid #2563eb; cursor: pointer; }
+        .alumno-row:hover { background: #e2e8f0; }
         .alumno-info { flex: 1; }
         .alumno-actions { display: flex; gap: 8px; }
         .edit-icon { cursor: pointer; font-size: 1.2rem; padding: 4px 8px; background: #e2e8f0; border-radius: 40px; display: inline-block; }
         .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 16px; }
         input, select, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 0.9rem; }
         label { font-weight: 500; display: block; margin-bottom: 4px; }
+        .search-filters { background: #f8fafc; padding: 16px; border-radius: 16px; margin-bottom: 20px; }
         #scannerModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: black; z-index: 10000; padding: 20px; }
         #qr-reader { width: 100%; margin-top: 60px; }
         .flex { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        .resultados { max-height: 500px; overflow-y: auto; }
     </style>
 </head>
 <body>
@@ -131,45 +134,114 @@
         else if(tab === 'prestamos') await cargarPrestamosRapido();
     }
     
-    // ==================== ALUMNOS ====================
+    // ==================== ALUMNOS (NUEVA VERSIÓN CON BUSCADOR) ====================
     async function cargarAlumnos() {
-        const { data: historial } = await supabase
-            .from('historial_alumnos')
-            .select('*, alumnos(*)')
-            .eq('ano_academico_id', currentAnoId);
-        
-        let html = `<div class="card">
-            <div class="flex"><h2>👨‍🎓 Listado de Alumnos</h2><button id="btnNuevoAlumno">➕ Nuevo Alumno</button></div>
-            <div class="flex"><input type="text" id="buscarAlumnoInput" placeholder="Buscar por nombre..."></div>
-            <div id="listaAlumnos"></div>
-        </div>`;
+        let html = `
+            <div class="card">
+                <div class="flex"><h2>👨‍🎓 Buscar Alumno</h2><button id="btnNuevoAlumno" class="success">➕ Nuevo Alumno</button></div>
+                <div class="search-filters">
+                    <div class="form-grid">
+                        <div><label>🔍 Buscar por</label><input type="text" id="searchInput" placeholder="Nombre, apellidos, código o curso..."></div>
+                    </div>
+                    <button id="btnBuscar" style="margin-top:10px;">Buscar</button>
+                    <button id="btnLimpiar" class="secondary" style="margin-top:10px;">Limpiar</button>
+                </div>
+                <div id="resultadosBusqueda" class="resultados">
+                    <p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar alumnos</p>
+                </div>
+            </div>
+        `;
         document.getElementById('mainPanel').innerHTML = html;
+        
         document.getElementById('btnNuevoAlumno').onclick = () => editarAlumno(null);
-        document.getElementById('buscarAlumnoInput').oninput = () => filtrarAlumnos(historial || []);
-        window.historialAlumnosGlobal = historial || [];
-        filtrarAlumnos(historial || []);
+        document.getElementById('btnBuscar').onclick = () => buscarAlumnos();
+        document.getElementById('btnLimpiar').onclick = () => {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('resultadosBusqueda').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar alumnos</p>';
+        };
+        // Permitir buscar con Enter
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') buscarAlumnos();
+        });
     }
     
-    function filtrarAlumnos(historial) {
-        const search = document.getElementById('buscarAlumnoInput')?.value.toLowerCase() || '';
-        const filtered = historial.filter(h => h.alumnos && (h.alumnos.nombre?.toLowerCase().includes(search)));
-        const container = document.getElementById('listaAlumnos');
-        if (!container) return;
-        if (filtered.length === 0) { container.innerHTML = '<p>No hay alumnos</p>'; return; }
-        let html = '';
-        filtered.forEach(h => {
-            html += `<div class="alumno-row">
-                <div class="alumno-info">
-                    <strong>${h.alumnos.nombre}</strong><br>
-                    ${h.curso || ''} ${h.grupo || ''} | Beca: ${h.beca ? 'Sí' : 'No'} | Socio: ${h.socio_ampa ? 'Sí' : 'No'}
+    async function buscarAlumnos() {
+        const searchTerm = document.getElementById('searchInput').value.trim();
+        const resultadosDiv = document.getElementById('resultadosBusqueda');
+        
+        if (!searchTerm) {
+            resultadosDiv.innerHTML = '<p style="color:#64748b; text-align:center;">Escribe algo para buscar</p>';
+            return;
+        }
+        
+        resultadosDiv.innerHTML = '<p>Buscando...</p>';
+        
+        // Búsqueda por nombre, apellidos (si existe), codigo_usuario, o curso (desde historial)
+        let query = supabase
+            .from('alumnos')
+            .select('*, historial_alumnos!inner(*)')
+            .eq('historial_alumnos.ano_academico_id', currentAnoId);
+        
+        // Intentar búsqueda por número de código si es número
+        if (!isNaN(searchTerm) && searchTerm !== '') {
+            query = query.eq('codigo_usuario', parseInt(searchTerm));
+        } else {
+            // Búsqueda por texto
+            query = query.or(`nombre.ilike.%${searchTerm}%,apellidos.ilike.%${searchTerm}%`);
+            // También buscar por curso
+            const { data: porCurso } = await supabase
+                .from('historial_alumnos')
+                .select('alumno_id')
+                .eq('ano_academico_id', currentAnoId)
+                .ilike('curso', `%${searchTerm}%`);
+            
+            if(porCurso && porCurso.length > 0) {
+                const ids = porCurso.map(p => p.alumno_id);
+                query = query.or(`id.in.(${ids.join(',')})`);
+            }
+        }
+        
+        const { data: alumnos, error } = await query;
+        
+        if (error) {
+            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            return;
+        }
+        
+        if (!alumnos || alumnos.length === 0) {
+            resultadosDiv.innerHTML = `
+                <p>No se encontraron alumnos</p>
+                <button id="btnCrearDesdeBusqueda" class="success">➕ Crear nuevo alumno</button>
+            `;
+            document.getElementById('btnCrearDesdeBusqueda')?.onclick = () => editarAlumno(null);
+            return;
+        }
+        
+        // Mostrar resultados
+        let html = `<h3>Resultados (${alumnos.length})</h3>`;
+        for (const alumno of alumnos) {
+            // Obtener datos del historial actual
+            const { data: historial } = await supabase
+                .from('historial_alumnos')
+                .select('*')
+                .eq('alumno_id', alumno.id)
+                .eq('ano_academico_id', currentAnoId)
+                .single();
+            
+            html += `
+                <div class="alumno-row" onclick="window.editarAlumno(${alumno.id})">
+                    <div class="alumno-info">
+                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
+                        🆔 ID: ${alumno.id}
+                    </div>
+                    <div class="alumno-actions">
+                        <span class="edit-icon" onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})">✏️</span>
+                    </div>
                 </div>
-                <div class="alumno-actions">
-                    <span class="edit-icon" onclick="window.editarAlumno(${h.alumnos.id})">✏️</span>
-                    <span class="edit-icon" onclick="window.darBajaAlumno(${h.alumnos.id})">🗑️</span>
-                </div>
-            </div>`;
-        });
-        container.innerHTML = html;
+            `;
+        }
+        resultadosDiv.innerHTML = html;
     }
     
     window.editarAlumno = async (alumnoId) => {
@@ -190,33 +262,47 @@
             <h2>${alumnoId ? '✏️ Editando: ' + (alumno?.nombre || '') : '➕ Nuevo Alumno'}</h2>
             <div class="form-grid">
                 <div><label>Nombre</label><input id="editNombre" value="${alumno?.nombre || ''}"></div>
+                <div><label>Apellidos</label><input id="editApellidos" value="${alumno?.apellidos || ''}"></div>
+                <div><label>Código de usuario (automático)</label><input id="editCodigo" value="${alumno?.codigo_usuario || 'Se generará automáticamente'}" disabled style="background:#f0f0f0;"></div>
                 <div><label>Curso</label><select id="editCurso"><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
                 <div><label>Grupo</label><input id="editGrupo" value="${historialActual?.grupo || ''}"></div>
                 <div><label>Teléfono</label><input id="editTelefono" value="${historialActual?.telefono || ''}"></div>
                 <div><label><input type="checkbox" id="editBilingue" ${historialActual?.bilingue ? 'checked' : ''}> Bilingüe</label></div>
                 <div><label><input type="checkbox" id="editBeca" ${historialActual?.beca ? 'checked' : ''}> Beca</label></div>
-                <div><label><input type="checkbox" id="editSocio" ${historialActual?.socio_ampa ? 'checked' : ''}> Socio AMPA</label></div>
-                <div><label><input type="checkbox" id="editDonante" ${historialActual?.donante ? 'checked' : ''}> Donante</label></div>
+                <div><label>Socio AMPA</label><input type="text" id="editSocioDisplay" value="${historialActual?.socio_ampa ? 'Sí' : 'No'}" disabled style="background:#f0f0f0;"></div>
+                <div><label>Donante</label><input type="text" id="editDonanteDisplay" value="${historialActual?.donante ? 'Sí' : 'No'}" disabled style="background:#f0f0f0;"></div>
                 <div><label>Observaciones</label><textarea id="editObservaciones">${historialActual?.observaciones || ''}</textarea></div>
+            </div>
+            <div style="background:#fef3c7; padding:12px; border-radius:12px; margin:12px 0;">
+                <small>📌 Nota: Socio AMPA y Donante se editan desde las secciones "SOCIOS AMPA" y "BIBLIOTECA" respectivamente.</small>
             </div>
             <h3>📚 Libros Prestados</h3>
             <div id="prestamosLista">${prestamos?.map(p => `<div>📖 ${p.libros?.titulo} <button onclick="window.devolverLibroRapido(${p.id})">Devolver</button></div>`).join('') || '<p>Sin préstamos activos</p>'}</div>
-            <div class="flex"><button id="guardarAlumnoBtn">💾 Guardar</button><button class="secondary" onclick="cargarAlumnos()">Cancelar</button></div>
+            <div class="flex">
+                <button id="guardarAlumnoBtn">💾 Guardar</button>
+                ${alumnoId ? '<button id="imprimirAlumnoBtn" class="secondary">🖨️ Imprimir ficha</button>' : ''}
+                ${alumnoId ? '<button id="bajaAlumnoBtn" class="danger">🗑️ Dar de baja</button>' : ''}
+                <button class="secondary" onclick="cargarAlumnos()">Cancelar</button>
+            </div>
         </div>`;
         document.getElementById('mainPanel').innerHTML = html;
+        
         if(document.getElementById('editCurso')) document.getElementById('editCurso').value = historialActual?.curso || '1ESO';
+        
         document.getElementById('guardarAlumnoBtn').onclick = async () => {
             let nuevoAlumnoId = alumnoId;
             if(!alumnoId) {
                 const { data: nuevo, error } = await supabase.from('alumnos').insert({ 
                     nombre: document.getElementById('editNombre').value,
-                    codigo_barras: 'AL-' + Date.now()
+                    apellidos: document.getElementById('editApellidos').value
                 }).select().single();
                 if(error) { alert('Error: ' + error.message); return; }
                 nuevoAlumnoId = nuevo.id;
+                alert(`Alumno creado con código: ${nuevo.codigo_usuario}`);
             } else {
                 await supabase.from('alumnos').update({ 
-                    nombre: document.getElementById('editNombre').value
+                    nombre: document.getElementById('editNombre').value,
+                    apellidos: document.getElementById('editApellidos').value
                 }).eq('id', alumnoId);
             }
             
@@ -228,8 +314,8 @@
                 telefono: document.getElementById('editTelefono').value,
                 bilingue: document.getElementById('editBilingue').checked,
                 beca: document.getElementById('editBeca').checked,
-                socio_ampa: document.getElementById('editSocio').checked,
-                donante: document.getElementById('editDonante').checked,
+                socio_ampa: historialActual?.socio_ampa || false,
+                donante: historialActual?.donante || false,
                 observaciones: document.getElementById('editObservaciones').value,
                 activo: true
             };
@@ -238,6 +324,46 @@
             alert('Alumno guardado');
             cargarAlumnos();
         };
+        
+        if(document.getElementById('imprimirAlumnoBtn')) {
+            document.getElementById('imprimirAlumnoBtn').onclick = () => {
+                const ventana = window.open('', '_blank');
+                ventana.document.write(`
+                    <html>
+                    <head><title>Ficha de ${alumno?.nombre}</title></head>
+                    <body style="font-family:sans-serif; padding:20px;">
+                        <h1>Ficha de Alumno</h1>
+                        <p><strong>Código:</strong> ${alumno?.codigo_usuario}</p>
+                        <p><strong>Nombre:</strong> ${alumno?.nombre} ${alumno?.apellidos || ''}</p>
+                        <p><strong>Curso:</strong> ${historialActual?.curso} ${historialActual?.grupo || ''}</p>
+                        <p><strong>Teléfono:</strong> ${historialActual?.telefono || '-'}</p>
+                        <p><strong>Bilingüe:</strong> ${historialActual?.bilingue ? 'Sí' : 'No'}</p>
+                        <p><strong>Beca:</strong> ${historialActual?.beca ? 'Sí' : 'No'}</p>
+                        <p><strong>Socio AMPA:</strong> ${historialActual?.socio_ampa ? 'Sí' : 'No'}</p>
+                        <p><strong>Donante:</strong> ${historialActual?.donante ? 'Sí' : 'No'}</p>
+                        <p><strong>Observaciones:</strong> ${historialActual?.observaciones || '-'}</p>
+                        <hr>
+                        <p>Fecha impresión: ${new Date().toLocaleString()}</p>
+                    </body>
+                    </html>
+                `);
+                ventana.document.close();
+            };
+        }
+        
+        if(document.getElementById('bajaAlumnoBtn')) {
+            document.getElementById('bajaAlumnoBtn').onclick = () => {
+                if(confirm('¿Dar de baja a este alumno? Se conservará el historial.')) {
+                    const motivo = prompt('Motivo de la baja:');
+                    if(motivo) {
+                        supabase.from('bajas_alumnos').insert({ alumno_id: alumnoId, motivo: motivo });
+                        supabase.from('historial_alumnos').update({ activo: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+                        alert('Alumno dado de baja');
+                        cargarAlumnos();
+                    }
+                }
+            };
+        }
     };
     
     window.devolverLibroRapido = async (prestamoId) => {
@@ -245,17 +371,6 @@
         alert('Libro devuelto');
         if(currentEditingAlumnoId) window.editarAlumno(currentEditingAlumnoId);
         else cargarAlumnos();
-    };
-    
-    window.darBajaAlumno = async (alumnoId) => {
-        if(!confirm('¿Dar de baja a este alumno?')) return;
-        const motivo = prompt('Motivo:');
-        if(motivo) {
-            await supabase.from('bajas_alumnos').insert({ alumno_id: alumnoId, motivo: motivo });
-            await supabase.from('historial_alumnos').update({ activo: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
-            alert('Alumno dado de baja');
-            cargarAlumnos();
-        }
     };
     
     // ==================== SOCIOS ====================
@@ -275,7 +390,7 @@
     
     async function registrarPagoSocio() {
         const { data: alumnos } = await supabase.from('alumnos').select('*');
-        let options = alumnos.map(a => `<option value="${a.id}">${a.nombre}</option>`).join('');
+        let options = alumnos.map(a => `<option value="${a.id}">${a.nombre} ${a.apellidos || ''}</option>`).join('');
         let html = `<div class="card"><h2>Registrar Pago AMPA</h2>
         <div class="form-grid"><div><label>Alumno</label><select id="socioAlumnoId">${options}</select></div>
         <div><label>Fecha Pago</label><input type="date" id="socioFechaPago" value="${new Date().toISOString().slice(0,10)}"></div></div>
@@ -364,23 +479,16 @@
         document.getElementById('btnEscanearPrestamo').onclick = () => { modoActual = "prestamo_rapido"; abrirScanner(); };
     }
     
-    // ==================== ESCÁNER CORREGIDO ====================
+    // ==================== ESCÁNER ====================
     function abrirScanner() {
         if (scannerActivo) return;
-        
         document.getElementById("scannerModal").style.display = "block";
-        
-        if (!html5QrCode) {
-            html5QrCode = new Html5Qrcode("qr-reader");
-        }
-        
+        if (!html5QrCode) html5QrCode = new Html5Qrcode("qr-reader");
         scannerActivo = true;
-        
         html5QrCode.start(
             { facingMode: "environment" },
             { fps: 10, qrbox: { width: 250, height: 250 } },
             (texto) => {
-                // Detener inmediatamente
                 if (html5QrCode && html5QrCode.isScanning) {
                     html5QrCode.stop().then(() => {
                         scannerActivo = false;
@@ -416,25 +524,4 @@
     
     async function procesarEscaneo(codigo) {
         if (modoActual === "prestamo_rapido") {
-            const { data: alumno } = await supabase.from('alumnos').select('*').eq('codigo_barras', codigo).maybeSingle();
-            if(alumno) {
-                window.editarAlumno(alumno.id);
-                alert(`Alumno: ${alumno.nombre}`);
-            } else {
-                alert('Código no reconocido');
-            }
-        }
-        modoActual = "";
-    }
-    
-    // ==================== INFORMES ====================
-    async function cargarInformes() {
-        let html = `<div class="card"><h2>📊 Informes</h2><p>Próximamente: exportación a Excel, filtros avanzados, etc.</p></div>`;
-        document.getElementById('mainPanel').innerHTML = html;
-    }
-    
-    init();
-})();
-</script>
-</body>
-</html>
+            const { data: alumno } = await supabase.from('alumnos').
