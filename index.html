@@ -181,6 +181,8 @@
 
 
     async function buscarAlumnosMejorado() {
+
+        const supabase = window.supabase;  // <--- AÑADE ESTA LÍNEA AQUÍ        
         // Obtener el año activo directamente desde la BD
         const { data: anoActivo, error: anoError } = await supabase
             .from('ano_academico')
