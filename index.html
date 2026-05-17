@@ -1123,8 +1123,11 @@
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         console.log("Filtros aplicados:", { searchTerm, materia, curso, editorial, estado, origen });
         let query = supabase.from('libros').select('*');
-        const verInactivos = document.getElementById('verLibrosInactivos')?.checked;
-        if (!verInactivos) {
+        const verSoloBaja = document.getElementById('verLibrosInactivos')?.checked;
+        
+        if (verSoloBaja) {
+            query = query.eq('activo', false);
+        } else {
             query = query.eq('activo', true);
         }
         
@@ -1168,15 +1171,15 @@
             html += `
                 <div class="alumno-row">
                     <div class="alumno-info">
-                        <strong>${libro.titulo}</strong><br>
+                        <strong>${libro.titulo}</strong> ${libro.activo === false ? '<span style="color:red;"> 🗑️ DADO DE BAJA</span>' : ''}<br>
                         📖 Signatura: ${libro.signatura || 'Sin asignar'} | Código: ${libro.codigo_barras}<br>
                         📚 Materia: ${libro.materia || '-'} | Curso: ${libro.curso_para || '-'}<br>
                         🏢 Editorial: ${libro.editorial || '-'} | Estado: ${libro.estado || 'nuevo'}<br>
                         🏷️ Origen: ${libro.origen || 'IES'} | ${estadoPrestamo}
                     </div>
                     <div class="alumno-actions">
-                        <button onclick="window.editarLibro('${libro.codigo_barras}')">✏️ Editar</button>
-                        <button class="danger" onclick="window.darBajaLibro('${libro.codigo_barras}')">🗑️ Dar baja</button>
+                        ${libro.activo === true ? `<button onclick="window.editarLibro('${libro.codigo_barras}')">✏️ Editar</button>` : ''}
+                        ${libro.activo === true ? `<button class="danger" onclick="window.darBajaLibro('${libro.codigo_barras}')">🗑️ Dar baja</button>` : ''}
                         ${prestamo ? `<button class="secondary" onclick="window.verPrestamoLibro('${libro.codigo_barras}')">👤 Ver quién lo tiene</button>` : ''}
                     </div>
                 </div>
