@@ -245,10 +245,14 @@
         
         // Filtrar por código de usuario
         if (codigoRaw) {
-            resultados = resultados.filter(a => {
-                const codigoStr = a.codigo_usuario ? a.codigo_usuario.toString() : '';
-                return codigoStr.includes(codigoRaw);
-            });
+            const codigoNum = parseInt(codigoRaw);
+            if (!isNaN(codigoNum)) {
+                // Búsqueda exacta por número
+                resultados = resultados.filter(a => a.codigo_usuario === codigoNum);
+            } else {
+                // Búsqueda por texto parcial
+                resultados = resultados.filter(a => a.codigo_usuario && a.codigo_usuario.toString().includes(codigoRaw));
+            }
         }
         
         // Filtrar por nombre
