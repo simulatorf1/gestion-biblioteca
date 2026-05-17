@@ -205,13 +205,7 @@
         const nombreBusq = normalizarTexto(nombreRaw);
         const apellidosBusq = normalizarTexto(apellidosRaw);
         
-        if (!nombreBusq && !apellidosBusq && !cursoFiltro && !codigoRaw) {
-            // Mostrar todos sin filtrar
-            console.log("Mostrando todos los alumnos");
-        } else if (!nombreBusq && !apellidosBusq && !cursoFiltro && !codigoRaw) {
-            resultadosDiv.innerHTML = '<p style="color:#64748b; text-align:center;">Escribe algo para buscar</p>';
-            return;
-        }
+        
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
