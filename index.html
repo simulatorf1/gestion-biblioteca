@@ -181,10 +181,9 @@
 
 
     async function buscarAlumnosMejorado() {
-
-        const supabase = window.supabase;  // <--- AÑADE ESTA LÍNEA AQUÍ        
+   
         // Obtener el año activo directamente desde la BD
-        const { data: anoActivo, error: anoError } = await supabase
+        const { data: anoActivo, error: anoError } = await supabaseDebug
             .from('ano_academico')
             .select('id')
             .eq('activo', true)
@@ -212,7 +211,7 @@
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
         // Consultar historial del año activo con datos del alumno
-        const { data: historiales, error } = await supabase
+        const { data: historiales, error } = await supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
             .eq('ano_academico_id', anoId);
