@@ -304,6 +304,30 @@
         
         const { data: prestamos } = alumnoId ? await supabase.from('prestamos').select('*, libros(*)').eq('alumno_id', alumnoId).eq('entregado', false) : { data: [] };
         
+        // Consultar libros donados por este alumno
+        const { data: librosDonados } = await supabase
+            .from('libros')
+            .select('titulo, materia, curso_para, fecha_compra, created_at')
+            .eq('donante_id', alumnoId)
+            .order('created_at', { ascending: false });
+        
+        let donacionesHtml = '<h3>📦 Libros Donados</h3>';
+        if (librosDonados && librosDonados.length > 0) {
+            donacionesHtml += '<div style="margin-bottom:15px;">';
+            for (const libro of librosDonados) {
+                donacionesHtml += `
+                    <div class="libro-item">
+                        📖 <strong>${libro.titulo}</strong><br>
+                        📚 Materia: ${libro.materia || '-'} | Curso: ${libro.curso_para || '-'}<br>
+                        📅 Donado el: ${libro.created_at ? libro.created_at.slice(0,10) : 'fecha no registrada'}
+                    </div>
+                `;
+            }
+            donacionesHtml += '</div>';
+        } else {
+            donacionesHtml += '<p>No ha donado libros</p>';
+        }
+        
         let html = `<div class="card">
             <h2>${alumnoId ? '✏️ Editando: ' + (alumno?.nombre || '') : '➕ Nuevo Alumno'}</h2>
             <div class="form-grid">
@@ -325,6 +349,7 @@
             </div>
             <h3>📚 Libros Prestados</h3>
             <div id="prestamosLista">${prestamos?.map(p => `<div>📖 ${p.libros?.titulo} <button onclick="window.devolverLibroRapido(${p.id})">Devolver</button></div>`).join('') || '<p>Sin préstamos activos</p>'}</div>
+            ${donacionesHtml}
             <div class="flex">
                 <button id="guardarAlumnoBtn">💾 Guardar</button>
                 ${alumnoId ? '<button id="imprimirAlumnoBtn" class="secondary">🖨️ Imprimir ficha</button>' : ''}
@@ -977,6 +1002,42 @@
             if (error) {
                 alert('Error: ' + error.message);
             } else {
+                // Si el libro es donado y hay donante, actualizar el historial del alumno
+                if (origen === 'Donado' && donanteId) {
+                    // Verificar si el alumno ya tiene historial este año
+                    const { data: historial } = await supabaseDebug
+                        .from('historial_alumnos')
+                        .select('donante, libros_donados')
+                        .eq('alumno_id', donanteId)
+                        .eq('ano_academico_id', currentAnoId)
+                        .maybeSingle();
+                    
+                    if (historial) {
+                        // Actualizar donante
+                        await supabaseDebug
+                            .from('historial_alumnos')
+                            .update({ 
+                                donante: true, 
+                                libros_donados: (historial.libros_donados || 0) + 1,
+                                fecha_donacion: new Date().toISOString().slice(0,10)
+                            })
+                            .eq('alumno_id', donanteId)
+                            .eq('ano_academico_id', currentAnoId);
+                    } else {
+                        // Crear historial si no existe
+                        await supabaseDebug
+                            .from('historial_alumnos')
+                            .insert({
+                                alumno_id: donanteId,
+                                ano_academico_id: currentAnoId,
+                                donante: true,
+                                libros_donados: 1,
+                                fecha_donacion: new Date().toISOString().slice(0,10),
+                                activo: true
+                            });
+                    }
+                }
+                
                 alert(`✅ Libro "${titulo}" añadido correctamente`);
                 cargarBiblioteca();
             }
