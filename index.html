@@ -453,35 +453,135 @@
     
     // ==================== SOCIOS ====================
     // ==================== SOCIOS AMPA (MEJORADO) ====================
+
     async function cargarSocios() {
         let html = `
             <div class="card">
                 <div class="flex"><h2>💰 Socios AMPA</h2></div>
                 <div class="search-filters">
                     <div class="form-grid">
-                        <div><label>🔍 Buscar socio</label><input type="text" id="searchSocioInput" placeholder="Nombre, apellidos o código de usuario..."></div>
+                        <div><label>🔍 Nombre</label><input type="text" id="socioNombre" placeholder="Ej: María"></div>
+                        <div><label>🔍 Apellidos</label><input type="text" id="socioApellidos" placeholder="Ej: García López"></div>
+                        <div><label>Curso</label><select id="socioCurso">
+                            <option value="">Todos</option>
+                            <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
+                            <option>1BAC</option><option>2BAC</option>
+                        </select></div>
+                        <div><label>Código de usuario</label><input type="text" id="socioCodigo" placeholder="Ej: 202670001"></div>
                     </div>
-                    <button id="btnBuscarSocio">Buscar</button>
-                    <button id="btnLimpiarSocio" class="secondary">Limpiar</button>
+                    <button id="btnBuscarSocio" style="margin-top:10px;">Buscar</button>
+                    <button id="btnLimpiarSocio" class="secondary" style="margin-top:10px;">Limpiar</button>
                 </div>
                 <div id="resultadosSocios" class="resultados">
-                    <p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar socios</p>
+                    <p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar alumnos</p>
                 </div>
             </div>
         `;
         document.getElementById('mainPanel').innerHTML = html;
         
-
-        document.getElementById('btnBuscarSocio').onclick = () => buscarSocios();
+        document.getElementById('btnBuscarSocio').onclick = () => buscarSociosMejorado();
         document.getElementById('btnLimpiarSocio').onclick = () => {
-            document.getElementById('searchSocioInput').value = '';
-            document.getElementById('resultadosSocios').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar socios</p>';
+            document.getElementById('socioNombre').value = '';
+            document.getElementById('socioApellidos').value = '';
+            document.getElementById('socioCurso').value = '';
+            document.getElementById('socioCodigo').value = '';
+            document.getElementById('resultadosSocios').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar alumnos</p>';
         };
-        document.getElementById('searchSocioInput').addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') buscarSocios();
+        
+        const inputs = ['socioNombre', 'socioApellidos', 'socioCurso', 'socioCodigo'];
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarSociosMejorado(); });
         });
     }
-    
+    async function buscarSociosMejorado() {
+        const nombreRaw = document.getElementById('socioNombre').value.trim();
+        const apellidosRaw = document.getElementById('socioApellidos').value.trim();
+        const cursoFiltro = document.getElementById('socioCurso').value;
+        const codigoRaw = document.getElementById('socioCodigo').value.trim();
+        
+        const resultadosDiv = document.getElementById('resultadosSocios');
+        
+        const nombreBusq = normalizarTexto(nombreRaw);
+        const apellidosBusq = normalizarTexto(apellidosRaw);
+        
+        resultadosDiv.innerHTML = '<p>Buscando...</p>';
+        
+        const { data: anoActivo } = await supabaseDebug.from('ano_academico').select('id').eq('activo', true).single();
+        const anoId = anoActivo.id;
+        
+        const { data: historiales, error } = await supabaseDebug
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', anoId);
+        
+        if (error) {
+            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            return;
+        }
+        
+        let resultados = historiales.map(h => ({
+            id: h.alumnos.id,
+            nombre: h.alumnos.nombre,
+            apellidos: h.alumnos.apellidos,
+            codigo_usuario: h.alumnos.codigo_usuario,
+            curso: h.curso,
+            grupo: h.grupo,
+            beca: h.beca
+        }));
+        
+        if (codigoRaw) {
+            resultados = resultados.filter(a => {
+                const codigoAlumno = a.codigo_usuario ? String(a.codigo_usuario) : '';
+                return codigoAlumno.includes(codigoRaw);
+            });
+        }
+        if (nombreBusq) {
+            resultados = resultados.filter(a => normalizarTexto(a.nombre || '').includes(nombreBusq));
+        }
+        if (apellidosBusq) {
+            resultados = resultados.filter(a => normalizarTexto(a.apellidos || '').includes(apellidosBusq));
+        }
+        if (cursoFiltro) {
+            resultados = resultados.filter(a => a.curso === cursoFiltro);
+        }
+        
+        if (resultados.length === 0) {
+            resultadosDiv.innerHTML = '<p>No se encontraron alumnos</p>';
+            return;
+        }
+        
+        let html = `<h3>Resultados (${resultados.length})</h3>`;
+        
+        for (const alumno of resultados) {
+            const { data: socio } = await supabaseDebug
+                .from('socios')
+                .select('*')
+                .eq('alumno_id', alumno.id)
+                .eq('ano_academico_id', anoId)
+                .maybeSingle();
+            
+            const esSocio = socio && socio.activo !== false;
+            const haPagado = socio?.pagado || false;
+            
+            html += `
+                <div class="alumno-row">
+                    <div class="alumno-info">
+                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso} ${alumno.grupo || ''}<br>
+                        ${esSocio ? (haPagado ? '✅ Socio - Pago registrado' : '⚠️ Socio - Pago pendiente') : '❌ No es socio'}
+                        ${socio ? `<br>📅 Fecha pago: ${socio.fecha_pago || 'No registrada'} | Nº Socio: ${socio.n_socio || '-'}` : ''}
+                    </div>
+                    <div class="alumno-actions">
+                        ${!esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
+                        ${esSocio ? `<button onclick="window.editarPagoSocio(${socio.id}, ${alumno.id})">✏️ Editar pago</button>` : ''}
+                        ${esSocio ? `<button class="danger" onclick="window.darBajaSocio(${socio.id}, ${alumno.id})">🗑️ Dar baja socio</button>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        resultadosDiv.innerHTML = html;
+    }    
     async function buscarSocios() {
         const searchTerm = document.getElementById('searchSocioInput').value.trim();
         const resultadosDiv = document.getElementById('resultadosSocios');
@@ -547,55 +647,26 @@
         resultadosDiv.innerHTML = html;
     }
     
-    window.registrarPagoSocio = async (alumnoId) => {
-        if (!alumnoId) {
-            // Mostrar selector de alumno
-            const { data: alumnos } = await supabase.from('alumnos').select('*').order('nombre');
-            let options = alumnos.map(a => `<option value="${a.id}">${a.nombre} ${a.apellidos || ''} (Código: ${a.codigo_usuario})</option>`).join('');
-            let html = `<div class="card"><h2>Registrar Nuevo Socio AMPA</h2>
-            <div class="form-grid">
-                <div><label>Alumno</label><select id="socioAlumnoId">${options}</select></div>
-                <div><label>Fecha Pago</label><input type="date" id="socioFechaPago" value="${new Date().toISOString().slice(0,10)}"></div>
-                <div><label><input type="checkbox" id="socioPagado" checked> Pago realizado</label></div>
-            </div>
-            <div class="flex"><button id="confirmarPagoBtn">Guardar</button><button class="secondary" onclick="cargarSocios()">Cancelar</button></div></div>`;
-            document.getElementById('mainPanel').innerHTML = html;
-            document.getElementById('confirmarPagoBtn').onclick = async () => {
-                const idAlumno = parseInt(document.getElementById('socioAlumnoId').value);
-                const fecha = document.getElementById('socioFechaPago').value;
-                const pagado = document.getElementById('socioPagado').checked;
-                const { data: ultimo } = await supabase.from('socios').select('n_socio').order('n_socio', { ascending: false }).limit(1);
-                let nuevoNumero = ultimo?.length ? ultimo[0].n_socio + 1 : 1;
-                await supabase.from('socios').insert({
-                    n_socio: nuevoNumero,
-                    alumno_id: idAlumno,
-                    ano_academico_id: currentAnoId,
-                    fecha_pago: fecha,
-                    pagado: pagado,
-                    activo: true
-                });
-                await supabase.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', idAlumno).eq('ano_academico_id', currentAnoId);
-                alert(`Socio registrado con Nº ${nuevoNumero}`);
-                cargarSocios();
-            };
-            return;
-        }
-        
-        // Si se pasa alumnoId directamente
+    window.registrarPagoSocioDirecto = async (alumnoId) => {
         const fecha = new Date().toISOString().slice(0,10);
-        const { data: ultimo } = await supabase.from('socios').select('n_socio').order('n_socio', { ascending: false }).limit(1);
-        let nuevoNumero = ultimo?.length ? ultimo[0].n_socio + 1 : 1;
-        await supabase.from('socios').insert({
-            n_socio: nuevoNumero,
+        
+        const { error } = await supabaseDebug.from('socios').insert({
             alumno_id: alumnoId,
             ano_academico_id: currentAnoId,
             fecha_pago: fecha,
             pagado: true,
             activo: true
         });
-        await supabase.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
-        alert(`Socio registrado con Nº ${nuevoNumero}`);
-        buscarSocios();
+        
+        if (error) {
+            alert('Error: ' + error.message);
+            return;
+        }
+        
+        await supabaseDebug.from('historial_alumnos').update({ socio_ampa: true }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+        
+        alert('✅ Socio registrado correctamente');
+        buscarSociosMejorado();
     };
     
     window.editarPagoSocio = async (socioId, alumnoId) => {
