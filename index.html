@@ -1190,24 +1190,6 @@
         
         if (!confirm("¿Confirmas dar de baja este libro?")) return;
         
-        // Primero obtener el id del libro usando supabase directamente
-        const { data: libro, error: findError } = await supabase
-            .from('libros')
-            .select('id')
-            .eq('codigo_barras', codigoBarras)
-            .maybeSingle();
-        
-        if (findError) {
-            console.error("Error al buscar libro:", findError);
-            alert("Error al buscar el libro: " + findError.message);
-            return;
-        }
-        
-        if (!libro) {
-            alert("No se encontró el libro con código: " + codigoBarras);
-            return;
-        }
-        
         // Actualizar libro (activo = false)
         const { error } = await supabase
             .from('libros')
@@ -1219,9 +1201,9 @@
             return;
         }
         
-        // Registrar la baja en tabla bajas_libros
+        // Registrar la baja en tabla bajas_libros (opcional)
         await supabase.from('bajas_libros').insert({
-            libro_id: libro.id,
+            libro_codigo: codigoBarras,
             motivo: motivo,
             fecha_baja: new Date().toISOString().slice(0,10)
         });
