@@ -181,8 +181,11 @@
     async function buscarClaseParaEntrega() {
         const curso = document.getElementById('filtroCursoEntrega').value;
         const grupo = document.getElementById('filtroGrupoEntrega').value.trim();
-        const resultadoDiv = document.getElementById('resultadoEntrega');
+        const resultadoDiv = document.getElementById('resultadoClaseEntrega');
         const entregaInfoDiv = document.getElementById('entregaInfo');
+        
+        resultadoDiv.innerHTML = '';
+        entregaInfoDiv.innerHTML = '';
         
         if (!curso) {
             resultadoDiv.innerHTML = '<p>Selecciona un curso</p>';
@@ -190,9 +193,7 @@
         }
         
         resultadoDiv.innerHTML = '<p>Buscando...</p>';
-        entregaInfoDiv.innerHTML = '';
         
-        // Buscar alumnos del curso/grupo
         let query = supabase
             .from('historial_alumnos')
             .select('*, alumnos(*)')
@@ -208,7 +209,6 @@
             return;
         }
         
-        // Obtener estado de entrega para cada alumno
         let html = `<h3>Clase: ${curso} ${grupo} (${alumnos.length} alumnos)</h3>
             <table style="width:100%; border-collapse:collapse;">
                 <thead><tr style="background:#2563eb; color:white;">
@@ -255,29 +255,37 @@
         let html = `
             <div style="margin-top:20px;">
                 <h3>✅ Entregar lote (confirmar recogida y firma)</h3>
-                <div class="search-filters">
-                    <div class="form-grid">
-                        <div><label>Buscar por alumno</label><input type="text" id="buscarAlumnoEntrega" placeholder="Nombre o código..." style="width:100%;"></div>
-                        <div><label>O filtrar por clase</label>
-                            <select id="filtroCursoEntrega">
-                                <option value="">Selecciona curso</option>
-                                <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
-                                <option>1BAC</option><option>2BAC</option>
-                            </select>
-                        </div>
-                        <div><label>Grupo</label><input type="text" id="filtroGrupoEntrega" placeholder="Ej: A, B, C" style="width:100%;"></div>
+                
+                <div style="background:#f8fafc; padding:16px; border-radius:16px; margin-bottom:20px;">
+                    <h4>🔍 Buscar por alumno</h4>
+                    <div class="flex">
+                        <input type="text" id="buscarAlumnoEntrega" placeholder="Nombre o código..." style="flex:1;">
+                        <button id="btnBuscarAlumnoEntrega">Buscar alumno</button>
                     </div>
-                    <button id="btnBuscarClaseEntrega">Buscar clase</button>
-                    <button id="btnBuscarAlumnoEntregaBtn" class="secondary">Buscar alumno</button>
+                    <div id="resultadoAlumnoEntrega" style="margin-top:10px;"></div>
                 </div>
-                <div id="resultadoEntrega" style="margin-top:10px;"></div>
+                
+                <div style="background:#f8fafc; padding:16px; border-radius:16px;">
+                    <h4>🔍 Buscar por clase</h4>
+                    <div class="flex">
+                        <select id="filtroCursoEntrega" style="flex:1;">
+                            <option value="">Selecciona curso</option>
+                            <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
+                            <option>1BAC</option><option>2BAC</option>
+                        </select>
+                        <input type="text" id="filtroGrupoEntrega" placeholder="Grupo (A, B, C...)" style="flex:1;">
+                        <button id="btnBuscarClaseEntrega">Buscar clase</button>
+                    </div>
+                    <div id="resultadoClaseEntrega" style="margin-top:10px;"></div>
+                </div>
+                
                 <div id="entregaInfo" style="margin-top:20px;"></div>
             </div>
         `;
         document.getElementById('subpanelPrestamos').innerHTML = html;
         
+        document.getElementById('btnBuscarAlumnoEntrega').onclick = () => buscarAlumnoParaEntrega();
         document.getElementById('btnBuscarClaseEntrega').onclick = () => buscarClaseParaEntrega();
-        document.getElementById('btnBuscarAlumnoEntregaBtn').onclick = () => buscarAlumnoParaEntrega();
         document.getElementById('buscarAlumnoEntrega').addEventListener('keypress', (e) => {
             if(e.key === 'Enter') buscarAlumnoParaEntrega();
         });
@@ -285,8 +293,11 @@
     
     async function buscarAlumnoParaEntrega() {
         const searchTerm = document.getElementById('buscarAlumnoEntrega').value.trim();
-        const resultadoDiv = document.getElementById('resultadoEntrega');
+        const resultadoDiv = document.getElementById('resultadoAlumnoEntrega');
         const entregaInfoDiv = document.getElementById('entregaInfo');
+        
+        resultadoDiv.innerHTML = '';
+        entregaInfoDiv.innerHTML = '';
         
         if (!searchTerm) {
             resultadoDiv.innerHTML = '<p>Escribe un nombre o código</p>';
@@ -310,7 +321,6 @@
         
         const alumno = alumnos[0];
         
-        // Obtener datos del historial
         const { data: historial } = await supabase
             .from('historial_alumnos')
             .select('*')
@@ -318,14 +328,13 @@
             .eq('ano_academico_id', currentAnoId)
             .single();
         
-        // Verificar si tiene libros prestados
         const { data: prestamos } = await supabase
             .from('prestamos')
             .select('*, libros(*)')
             .eq('alumno_id', alumno.id)
             .eq('entregado', false);
         
-        const tieneLibrosPrestados = prestamos && prestamos.length > 0;
+        const tieneLibros = prestamos && prestamos.length > 0;
         const yaEntregado = historial?.lote_entregado || false;
         
         resultadoDiv.innerHTML = `
@@ -338,7 +347,7 @@
             </div>
         `;
         
-        if (!tieneLibrosPrestados) {
+        if (!tieneLibros) {
             entregaInfoDiv.innerHTML = '<p>⚠️ Este alumno no tiene libros prestados actualmente.</p>';
             return;
         }
