@@ -181,8 +181,7 @@
 
 
     async function buscarAlumnosMejorado() {
-   
-        // Obtener el año activo directamente desde la BD
+        // Obtener el año activo
         const { data: anoActivo, error: anoError } = await supabaseDebug
             .from('ano_academico')
             .select('id')
@@ -206,11 +205,9 @@
         const nombreBusq = normalizarTexto(nombreRaw);
         const apellidosBusq = normalizarTexto(apellidosRaw);
         
-        
-        
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        // Consultar historial del año activo con datos del alumno
+        // Consultar historial del año activo
         const { data: historiales, error } = await supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
@@ -238,16 +235,12 @@
             socio_ampa: h.socio_ampa
         }));
         
-        // Filtrar por código de usuario
+        // Filtrar por código de usuario (SIEMPRE como string)
         if (codigoRaw) {
-            const codigoNum = parseInt(codigoRaw);
-            if (!isNaN(codigoNum)) {
-                // Búsqueda exacta por número
-                resultados = resultados.filter(a => a.codigo_usuario === codigoNum);
-            } else {
-                // Búsqueda por texto parcial
-                resultados = resultados.filter(a => a.codigo_usuario && a.codigo_usuario.toString().includes(codigoRaw));
-            }
+            resultados = resultados.filter(a => {
+                const codigoAlumno = a.codigo_usuario ? String(a.codigo_usuario) : '';
+                return codigoAlumno.includes(codigoRaw);
+            });
         }
         
         // Filtrar por nombre
@@ -265,6 +258,7 @@
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
+        // Mostrar resultados o mensaje
         if (resultados.length === 0) {
             resultadosDiv.innerHTML = `
                 <p>No se encontraron alumnos</p>
