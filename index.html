@@ -179,7 +179,110 @@
         });
     }
 
-
+    async function mostrarEntregarLote() {
+        let html = `
+            <div style="margin-top:20px;">
+                <h3>✅ Entregar lote (confirmar recogida y firma)</h3>
+                <div class="search-filters">
+                    <input type="text" id="buscarAlumnoEntrega" placeholder="Buscar alumno por nombre o código..." style="width:100%;">
+                    <button id="btnBuscarAlumnoEntrega">Buscar alumno</button>
+                </div>
+                <div id="resultadoEntrega" style="margin-top:10px;"></div>
+                <div id="entregaInfo" style="margin-top:20px;"></div>
+            </div>
+        `;
+        document.getElementById('subpanelPrestamos').innerHTML = html;
+        
+        document.getElementById('btnBuscarAlumnoEntrega').onclick = () => buscarAlumnoParaEntrega();
+        document.getElementById('buscarAlumnoEntrega').addEventListener('keypress', (e) => {
+            if(e.key === 'Enter') buscarAlumnoParaEntrega();
+        });
+    }
+    
+    async function buscarAlumnoParaEntrega() {
+        const searchTerm = document.getElementById('buscarAlumnoEntrega').value.trim();
+        const resultadoDiv = document.getElementById('resultadoEntrega');
+        const entregaInfoDiv = document.getElementById('entregaInfo');
+        
+        if (!searchTerm) {
+            resultadoDiv.innerHTML = '<p>Escribe un nombre o código</p>';
+            return;
+        }
+        
+        let query = supabase.from('alumnos').select('*, historial_alumnos!inner(*)').eq('historial_alumnos.ano_academico_id', currentAnoId);
+        
+        if (!isNaN(searchTerm)) {
+            query = query.eq('codigo_usuario', parseInt(searchTerm));
+        } else {
+            query = query.ilike('nombre', `%${searchTerm}%`);
+        }
+        
+        const { data: alumnos } = await query;
+        
+        if (!alumnos || alumnos.length === 0) {
+            resultadoDiv.innerHTML = '<p>No se encontró el alumno</p>';
+            return;
+        }
+        
+        const alumno = alumnos[0];
+        
+        // Obtener datos del historial
+        const { data: historial } = await supabase
+            .from('historial_alumnos')
+            .select('*')
+            .eq('alumno_id', alumno.id)
+            .eq('ano_academico_id', currentAnoId)
+            .single();
+        
+        // Verificar si tiene libros prestados
+        const { data: prestamos } = await supabase
+            .from('prestamos')
+            .select('*, libros(*)')
+            .eq('alumno_id', alumno.id)
+            .eq('entregado', false);
+        
+        const tieneLibrosPrestados = prestamos && prestamos.length > 0;
+        const yaEntregado = historial?.lote_entregado || false;
+        
+        resultadoDiv.innerHTML = `
+            <div class="alumno-row">
+                <div class="alumno-info">
+                    <strong>✅ Alumno: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                    📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
+                    ${historial?.beca ? '🎓 Becado | ' : ''}${historial?.socio_ampa ? '💰 Socio AMPA' : ''}
+                </div>
+            </div>
+        `;
+        
+        if (!tieneLibrosPrestados) {
+            entregaInfoDiv.innerHTML = '<p>⚠️ Este alumno no tiene libros prestados actualmente.</p>';
+            return;
+        }
+        
+        if (yaEntregado) {
+            entregaInfoDiv.innerHTML = '<p>✅ Este alumno ya ha entregado el lote y firmado la ficha.</p>';
+            return;
+        }
+        
+        entregaInfoDiv.innerHTML = `
+            <div class="card">
+                <h4>📦 Libros a entregar (${prestamos.length})</h4>
+                ${prestamos.map(p => `<div class="libro-item">📖 ${p.libros?.titulo}</div>`).join('')}
+                <button id="btnConfirmarEntrega" class="success" style="margin-top:15px;">✅ Confirmar entrega y firma</button>
+            </div>
+        `;
+        
+        document.getElementById('btnConfirmarEntrega').onclick = async () => {
+            await supabase
+                .from('historial_alumnos')
+                .update({ lote_entregado: true, fecha_entrega: new Date().toISOString().slice(0,10) })
+                .eq('alumno_id', alumno.id)
+                .eq('ano_academico_id', currentAnoId);
+            
+            alert(`✅ Entrega confirmada para ${alumno.nombre}`);
+            mostrarEntregarLote();
+        };
+    }
     async function buscarAlumnosMejorado() {
         // Obtener el año activo
         const { data: anoActivo, error: anoError } = await supabaseDebug
@@ -1557,23 +1660,25 @@
             <div class="card">
                 <h2>🔄 Gestión de Préstamos</h2>
                 <div class="flex">
-                    <button id="btnDarPrestamo" class="success">📤 Dar préstamo (lote)</button>
-                    <button id="btnRecogerLibro" class="warning">📥 Recoger libro (devolución)</button>
+                    <button id="btnPrepararLote" class="success">📦 Preparar lote</button>
+                    <button id="btnEntregarLote" class="success">✅ Entregar lote</button>
+                    <button id="btnRecogerLote" class="warning">📥 Recoger lote</button>
                 </div>
                 <div id="subpanelPrestamos"></div>
             </div>
         `;
         document.getElementById('mainPanel').innerHTML = html;
         
-        document.getElementById('btnDarPrestamo').onclick = () => mostrarDarPrestamo();
-        document.getElementById('btnRecogerLibro').onclick = () => mostrarRecogerLibro();
+        document.getElementById('btnPrepararLote').onclick = () => mostrarPrepararLote();
+        document.getElementById('btnEntregarLote').onclick = () => mostrarEntregarLote();
+        document.getElementById('btnRecogerLote').onclick = () => mostrarRecogerLote();
     }
 
     // ==================== DAR PRÉSTAMO (LOTE CON ESCÁNER) ====================
     let loteTemporalPrestamo = [];
     let alumnoSeleccionado = null;
     
-    async function mostrarDarPrestamo() {
+    async function mostrarPrepararLote() {
         loteTemporalPrestamo = [];
         alumnoSeleccionado = null;
         
@@ -1812,14 +1917,14 @@
         alert(`✅ ${exitos} libros prestados a ${alumnoSeleccionado.nombre}`);
         loteTemporalPrestamo = [];
         alumnoSeleccionado = null;
-        mostrarDarPrestamo();
+        mostrarPrepararLote();
     }
     
     // ==================== RECOGER LIBRO (DEVOLUCIÓN CON ESCÁNER) ====================
     let devolucionAlumno = null;
     let devolucionLibros = [];
     
-    async function mostrarRecogerLibro() {
+    async function mostrarRecogerLote()() {
         devolucionAlumno = null;
         devolucionLibros = [];
         
@@ -1945,7 +2050,7 @@
         if (btnFinalizar) {
             btnFinalizar.onclick = function() {
                 devolucionAlumno = null;
-                mostrarRecogerLibro();
+                mostrarRecogerLote()();
             };
         }
         
@@ -1954,7 +2059,7 @@
         if (btnCerrar) {
             btnCerrar.onclick = function() {
                 devolucionAlumno = null;
-                mostrarRecogerLibro();
+                mostrarRecogerLote()();
             };
         }
     }
