@@ -52,7 +52,7 @@
         <button class="nav-tab active" data-tab="alumnos">👨‍🎓 ALUMNOS</button>
         <button class="nav-tab" data-tab="socios">💰 SOCIOS AMPA</button>
         <button class="nav-tab" data-tab="biblioteca">📖 BIBLIOTECA</button>
-        <button class="nav-tab" data-tab="informes">📊 INFORMES</button>
+        <button class="nav-tab" data-tab="busqueda">🔍 BÚSQUEDA RÁPIDA</button>
         <button class="nav-tab" data-tab="prestamos">🔄 PRÉSTAMOS</button>
     </div>
 
@@ -131,7 +131,7 @@
         if(tab === 'alumnos') await cargarAlumnos();
         else if(tab === 'socios') await cargarSocios();
         else if(tab === 'biblioteca') await cargarBiblioteca();
-        else if(tab === 'informes') await cargarInformes();
+        else if(tab === 'busqueda') await cargarBusquedaRapida();
         else if(tab === 'prestamos') await cargarPrestamosRapido();
     }
     
@@ -1883,45 +1883,151 @@
     }
     
     // ==================== INFORMES ====================
-    async function cargarInformes() {
+    // ==================== BÚSQUEDA RÁPIDA ====================
+    async function cargarBusquedaRapida() {
         let html = `
             <div class="card">
-                <h2>📊 Panel de Control</h2>
+                <h2>🔍 BÚSQUEDA RÁPIDA</h2>
                 <div class="search-filters">
                     <div class="form-grid">
-                        <div><label>Filtrar por curso</label><select id="filtroCursoInforme"><option value="">Todos</option><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
-                        <div><label>Filtrar por grupo</label><input type="text" id="filtroGrupoInforme" placeholder="Ej: A, B, C"></div>
+                        <div><label>Filtrar por curso</label><select id="filtroCursoRapido">
+                            <option value="">Todos</option>
+                            <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
+                            <option>1BAC</option><option>2BAC</option>
+                        </select></div>
+                        <div><label>Filtrar por grupo</label><input type="text" id="filtroGrupoRapido" placeholder="Ej: A, B, C"></div>
+                        <div><label>Tipo de listado</label><select id="tipoListado">
+                            <option value="todos">📋 Todos los alumnos</option>
+                            <option value="becados">🎓 Alumnos becados</option>
+                            <option value="bilingues">🌍 Alumnos bilingües</option>
+                            <option value="socios">💰 Socios AMPA</option>
+                            <option value="no_socios">❌ No socios AMPA</option>
+                            <option value="donantes">📦 Alumnos donantes</option>
+                            <option value="prestamos">📚 Préstamos activos</option>
+                            <option value="problemas">⚠️ Con observaciones</option>
+                        </select></div>
                     </div>
-                    <button id="btnActualizarInformes" class="success">Actualizar</button>
+                    <button id="btnGenerarListado" class="success">Generar listado</button>
+                    <button id="btnExportarExcel" class="secondary">📎 Exportar a Excel</button>
+                    <button id="btnExportarPDF" class="secondary">📄 Exportar a PDF</button>
                 </div>
-                <div id="informesTarjetas" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 20px;">
-                    <div class="card" style="text-align:center;"><h3>Cargando...</h3></div>
-                </div>
-            </div>
-            <div class="card">
-                <h3>📋 Listados rápidos</h3>
-                <div class="flex">
-                    <button id="btnListaAlumnosBecados">🎓 Alumnos becados</button>
-                    <button id="btnListaSociosPendientes">💰 Socios con pago pendiente</button>
-                    <button id="btnListaPrestamosActivos">📚 Préstamos activos</button>
-                    <button id="btnListaDonantes">📖 Alumnos donantes</button>
-                    <button id="btnListaProblemas">⚠️ Alumnos con observaciones</button>
-                </div>
-                <div id="listaInformesResultados" style="margin-top: 20px; max-height: 400px; overflow-y: auto;">
-                    <p style="color:#64748b;">Selecciona un listado para ver detalles</p>
+                <div id="resultadoListado" class="resultados">
+                    <p style="color:#64748b;">Selecciona filtros y haz clic en "Generar listado"</p>
                 </div>
             </div>
         `;
         document.getElementById('mainPanel').innerHTML = html;
         
-        document.getElementById('btnActualizarInformes').onclick = () => cargarEstadisticas();
-        document.getElementById('btnListaAlumnosBecados').onclick = () => listarAlumnosBecados();
-        document.getElementById('btnListaSociosPendientes').onclick = () => listarSociosPendientes();
-        document.getElementById('btnListaPrestamosActivos').onclick = () => listarPrestamosActivosInforme();
-        document.getElementById('btnListaDonantes').onclick = () => listarDonantes();
-        document.getElementById('btnListaProblemas').onclick = () => listarAlumnosProblemas();
+        document.getElementById('btnGenerarListado').onclick = () => generarListado();
+        document.getElementById('btnExportarExcel').onclick = () => exportarAExcel();
+        document.getElementById('btnExportarPDF').onclick = () => exportarAPDF();
+    }
+    
+    async function generarListado() {
+        const curso = document.getElementById('filtroCursoRapido').value;
+        const grupo = document.getElementById('filtroGrupoRapido').value;
+        const tipo = document.getElementById('tipoListado').value;
         
-        cargarEstadisticas();
+        const resultadosDiv = document.getElementById('resultadoListado');
+        resultadosDiv.innerHTML = '<p>Cargando...</p>';
+        
+        let query = supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', currentAnoId);
+        
+        if (curso) query = query.eq('curso', curso);
+        if (grupo) query = query.eq('grupo', grupo);
+        
+        if (tipo === 'becados') query = query.eq('beca', true);
+        if (tipo === 'bilingues') query = query.eq('bilingue', true);
+        if (tipo === 'socios') query = query.eq('socio_ampa', true);
+        if (tipo === 'no_socios') query = query.eq('socio_ampa', false);
+        if (tipo === 'donantes') query = query.eq('donante', true);
+        if (tipo === 'problemas') query = query.not('observaciones', 'is', null).neq('observaciones', '');
+        
+        if (tipo === 'prestamos') {
+            const { data: prestamos } = await supabase
+                .from('prestamos_activos')
+                .select('*');
+            
+            if (!prestamos || prestamos.length === 0) {
+                resultadosDiv.innerHTML = '<p>No hay préstamos activos</p>';
+                return;
+            }
+            
+            let html = `<h3>📚 Préstamos activos (${prestamos.length})</h3>
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead><tr><th>Libro</th><th>Alumno</th><th>Curso</th><th>Fecha préstamo</th></tr></thead>
+                    <tbody>`;
+            for (const p of prestamos) {
+                html += `<tr><td>${p.libro}</td><td>${p.alumno}</td><td>${p.curso || '-'}</td><td>${p.fecha_prestamo}</td></tr>`;
+            }
+            html += `</tbody></table>`;
+            resultadosDiv.innerHTML = html;
+            return;
+        }
+        
+        const { data: alumnos } = await query;
+        
+        if (!alumnos || alumnos.length === 0) {
+            resultadosDiv.innerHTML = '<p>No se encontraron resultados</p>';
+            return;
+        }
+        
+        let html = `<h3>Resultados: ${alumnos.length} alumnos</h3>
+            <table style="width:100%; border-collapse:collapse; border:1px solid #ddd;">
+                <thead><tr style="background:#2563eb; color:white;">
+                    <th>Nombre</th><th>Apellidos</th><th>Curso</th><th>Grupo</th><th>Beca</th><th>Socio</th><th>Donante</th>
+                </tr></thead>
+                <tbody>`;
+        
+        for (const a of alumnos) {
+            html += `<tr style="border-bottom:1px solid #ddd;">
+                <td>${a.alumnos.nombre || ''}</td>
+                <td>${a.alumnos.apellidos || ''}</td>
+                <td>${a.curso || '-'}</td>
+                <td>${a.grupo || '-'}</td>
+                <td style="text-align:center">${a.beca ? '✅' : '❌'}</td>
+                <td style="text-align:center">${a.socio_ampa ? '✅' : '❌'}</td>
+                <td style="text-align:center">${a.donante ? '✅' : '❌'}</td>
+            </tr>`;
+        }
+        html += `</tbody></table>`;
+        resultadosDiv.innerHTML = html;
+    }
+    
+    function exportarAExcel() {
+        const tabla = document.querySelector('#resultadoListado table');
+        if (!tabla) {
+            alert('Primero genera un listado');
+            return;
+        }
+        const html = tabla.outerHTML;
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'listado.xls';
+        link.click();
+    }
+    
+    function exportarAPDF() {
+        const tabla = document.querySelector('#resultadoListado table');
+        if (!tabla) {
+            alert('Primero genera un listado');
+            return;
+        }
+        const ventana = window.open('', '_blank');
+        ventana.document.write(`
+            <html>
+            <head><title>Listado</title>
+            <style>table,th,td{border:1px solid black;border-collapse:collapse;padding:8px;}</style>
+            </head>
+            <body>${tabla.outerHTML}</body>
+            </html>
+        `);
+        ventana.document.close();
+        ventana.print();
     }
     
     async function cargarEstadisticas() {
