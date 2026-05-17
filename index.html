@@ -766,60 +766,147 @@
         });
     }
     async function procesarNuevoLibroConEscanner(codigo) {
-        // PRIMERO: comprobar si el libro ya existe
-        const { data: libroExistente } = await supabase
+        // Comprobar si ya existe
+        const { data: libroExistente } = await supabaseDebug
             .from('libros')
             .select('titulo')
             .eq('codigo_barras', codigo)
             .maybeSingle();
         
         if (libroExistente) {
-            alert(`⚠️ El libro "${libroExistente.titulo}" ya está registrado en la biblioteca.`);
+            alert(`⚠️ El libro "${libroExistente.titulo}" ya está registrado`);
             return;
         }
         
-        // Si no existe, continuar con las preguntas
-        const titulo = prompt("📖 Título del libro:");
-        if (!titulo) return;
+        // Obtener listas de materias, editoriales y años existentes
+        const { data: materiasBD } = await supabaseDebug.from('libros').select('materia').not('materia', 'is', null);
+        const { data: editorialesBD } = await supabaseDebug.from('libros').select('editorial').not('editorial', 'is', null);
         
-        const materia = prompt("📚 Materia (Ej: Matemáticas):");
-        if (!materia) return;
+        const materias = [...new Set(materiasBD.map(m => m.materia))];
+        const editoriales = [...new Set(editorialesBD.map(e => e.editorial))];
+        const años = ['2020', '2021', '2022', '2023', '2024', '2025', '2026'];
         
-        const curso = prompt("🎓 Curso (1ESO, 2ESO, 3ESO, 4ESO, 1BAC, 2BAC):");
+        let html = `
+            <div class="card">
+                <h2>📖 Nuevo Libro</h2>
+                <p>Código escaneado: <strong>${codigo}</strong></p>
+                <div class="form-grid">
+                    <div><label>Título *</label><input id="nuevoTitulo" placeholder="Título del libro"></div>
+                    
+                    <div><label>Materia *</label>
+                        <select id="nuevoMateria">
+                            <option value="">Selecciona o escribe...</option>
+                            ${materias.map(m => `<option value="${m}">${m}</option>`).join('')}
+                        </select>
+                        <input type="text" id="nuevaMateriaInput" placeholder="O escribe una nueva materia" style="margin-top:5px;">
+                    </div>
+                    
+                    <div><label>Editorial</label>
+                        <select id="nuevoEditorial">
+                            <option value="">Selecciona o escribe...</option>
+                            ${editoriales.map(e => `<option value="${e}">${e}</option>`).join('')}
+                        </select>
+                        <input type="text" id="nuevaEditorialInput" placeholder="O escribe una nueva editorial" style="margin-top:5px;">
+                    </div>
+                    
+                    <div><label>Curso</label><select id="nuevoCurso">
+                        <option value="">Selecciona</option>
+                        <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
+                        <option>1BAC</option><option>2BAC</option>
+                    </select></div>
+                    
+                    <div><label>Estado</label><select id="nuevoEstado">
+                        <option>nuevo</option><option>usado</option><option>desgastado</option>
+                    </select></div>
+                    
+                    <div><label>Origen</label><select id="nuevoOrigen">
+                        <option>IES</option><option>AMPA</option><option>Donado</option>
+                    </select></div>
+                    
+                    <div><label>Año compra</label><select id="nuevoAnio">
+                        <option value="">Selecciona</option>
+                        ${años.map(a => `<option value="${a}">${a}</option>`).join('')}
+                    </select></div>
+                    
+                    <div><label>Signatura (XX - XX - XXX)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" id="sig1" placeholder="XX" maxlength="2" style="width:70px;">
+                            <span>-</span>
+                            <input type="text" id="sig2" placeholder="XX" maxlength="2" style="width:70px;">
+                            <span>-</span>
+                            <input type="text" id="sig3" placeholder="XXX" maxlength="3" style="width:90px;">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex"><button id="guardarNuevoLibroBtn">💾 Guardar libro</button>
+                <button class="secondary" onclick="cargarBiblioteca()">Cancelar</button></div>
+            </div>
+        `;
         
-        const editorial = prompt("🏢 Editorial:");
+        document.getElementById('mainPanel').innerHTML = html;
         
-        const estado = prompt("📌 Estado (nuevo/usado/desgastado):", "nuevo");
-        
-        const origen = prompt("🏷️ Origen (IES/AMPA/Donado):", "IES");
-        
-        const anioCompra = prompt("📅 Año compra (Ej: 2024):", "2024");
-        
-        const signatura = prompt("🔢 Signatura:");
-        
-        if (!titulo || !materia) {
-            alert("Título y materia son obligatorios");
-            return;
-        }
-        
-        const { error } = await supabase.from('libros').insert({
-            codigo_barras: codigo,
-            titulo: titulo,
-            materia: materia,
-            curso_para: curso,
-            editorial: editorial,
-            estado: estado,
-            origen: origen,
-            fecha_compra: anioCompra ? `${anioCompra}-01-01` : null,
-            signatura: signatura
+        // Añadir opciones nuevas a materias
+        document.getElementById('nuevaMateriaInput').addEventListener('change', function() {
+            if(this.value) {
+                const select = document.getElementById('nuevoMateria');
+                const option = document.createElement('option');
+                option.value = this.value;
+                option.text = this.value + " (nueva)";
+                select.appendChild(option);
+                select.value = this.value;
+            }
         });
         
-        if (error) {
-            alert("Error al guardar: " + error.message);
-        } else {
-            alert(`✅ Libro "${titulo}" añadido correctamente`);
-            buscarLibros();
-        }
+        // Añadir opciones nuevas a editoriales
+        document.getElementById('nuevaEditorialInput').addEventListener('change', function() {
+            if(this.value) {
+                const select = document.getElementById('nuevoEditorial');
+                const option = document.createElement('option');
+                option.value = this.value;
+                option.text = this.value + " (nueva)";
+                select.appendChild(option);
+                select.value = this.value;
+            }
+        });
+        
+        document.getElementById('guardarNuevoLibroBtn').onclick = async () => {
+            const titulo = document.getElementById('nuevoTitulo').value.trim();
+            const materia = document.getElementById('nuevoMateria').value || document.getElementById('nuevaMateriaInput').value;
+            const editorial = document.getElementById('nuevoEditorial').value || document.getElementById('nuevaEditorialInput').value;
+            const curso = document.getElementById('nuevoCurso').value;
+            const estado = document.getElementById('nuevoEstado').value;
+            const origen = document.getElementById('nuevoOrigen').value;
+            const anio = document.getElementById('nuevoAnio').value;
+            const sig1 = document.getElementById('sig1').value;
+            const sig2 = document.getElementById('sig2').value;
+            const sig3 = document.getElementById('sig3').value;
+            
+            if (!titulo || !materia || !curso) {
+                alert('Título, materia y curso son obligatorios');
+                return;
+            }
+            
+            const signatura = `${sig1}-${sig2}-${sig3}`;
+            
+            const { error } = await supabaseDebug.from('libros').insert({
+                codigo_barras: codigo,
+                titulo: titulo,
+                materia: materia,
+                editorial: editorial,
+                curso_para: curso,
+                estado: estado,
+                origen: origen,
+                fecha_compra: anio ? `${anio}-01-01` : null,
+                signatura: signatura || null
+            });
+            
+            if (error) {
+                alert('Error: ' + error.message);
+            } else {
+                alert(`✅ Libro "${titulo}" añadido correctamente`);
+                cargarBiblioteca();
+            }
+        };
     }
     function limpiarFiltrosLibros() {
         document.getElementById('searchLibroInput').value = '';
