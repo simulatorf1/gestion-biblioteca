@@ -940,15 +940,28 @@
     
     // ==================== BIBLIOTECA ====================
     async function cargarBiblioteca() {
+        // Obtener listas de materias y editoriales existentes
+        const { data: materiasBD } = await supabase.from('libros').select('materia').not('materia', 'is', null);
+        const { data: editorialesBD } = await supabase.from('libros').select('editorial').not('editorial', 'is', null);
+        const materias = [...new Set(materiasBD.map(m => m.materia))];
+        const editoriales = [...new Set(editorialesBD.map(e => e.editorial))];
+
+        
         let html = `
             <div class="card">
                 <div class="flex"><h2>📖 Biblioteca</h2><button id="btnNuevoLibro" class="success">➕ Añadir Libro (escanear)</button></div>
                 <div class="search-filters">
                     <div class="form-grid">
                         <div><label>🔍 Buscar</label><input type="text" id="searchLibroInput" placeholder="Título, signatura o código..."></div>
-                        <div><label>Materia</label><input type="text" id="filtroMateria" placeholder="Ej: Matemáticas"></div>
+                        <div><label>Materia</label><select id="filtroMateria">
+                            <option value="">Todas</option>
+                            ${materias.map(m => `<option value="${m}">${m}</option>`).join('')}
+                        </select></div>
                         <div><label>Curso</label><select id="filtroCurso"><option value="">Todos</option><option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option><option>1BAC</option><option>2BAC</option></select></div>
-                        <div><label>Editorial</label><input type="text" id="filtroEditorial" placeholder="Editorial"></div>
+                        <div><label>Editorial</label><select id="filtroEditorial">
+                            <option value="">Todas</option>
+                            ${editoriales.map(e => `<option value="${e}">${e}</option>`).join('')}
+                        </select></div>
                         <div><label>Estado</label><select id="filtroEstado"><option value="">Todos</option><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
                         <div><label>Origen</label><select id="filtroOrigen"><option value="">Todos</option><option>AMPA</option><option>IES</option><option>Donado</option></select></div>
                         <div><label><input type="checkbox" id="verLibrosInactivos"> 📋 Mostrar libros dados de baja</label></div>                        
@@ -1004,7 +1017,7 @@
                         </select>
                         <input type="text" id="nuevaMateriaInput" placeholder="O escribe una nueva materia" style="margin-top:5px;">
                     </div>
-                    
+                    <small style="color:#64748b; display:block; margin-top:5px;">📌 Si el libro está dividido en trimestres, escribe la materia seguida del número de trimestre. Ejemplo: Matemáticas 2</small>                    
                     <div><label>Editorial</label>
                         <select id="nuevoEditorial">
                             <option value="">Selecciona o escribe...</option>
@@ -1012,7 +1025,10 @@
                         </select>
                         <input type="text" id="nuevaEditorialInput" placeholder="O escribe una nueva editorial" style="margin-top:5px;">
                     </div>
-                    
+                    <div><label>Incidencia</label>
+                        <input type="text" id="nuevaIncidencia" placeholder="Sin incidencias" disabled style="background:#f0f0f0;">
+                        <small style="color:#64748b;">📌 Las incidencias solo pueden editarse después de crear el libro</small>
+                    </div>                    
                     <div><label>Curso *</label><select id="nuevoCurso">
                         <option value="">Selecciona</option>
                         <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
@@ -1175,6 +1191,7 @@
                 curso_para: curso,
                 estado: estado,
                 origen: origen,
+                incidencia: null,
                 fecha_compra: anio ? `${anio}-01-01` : null,
                 signatura: signatura,
                 donante_id: origen === 'Donado' && donanteId ? parseInt(donanteId) : null
@@ -1295,9 +1312,9 @@
     
     async function buscarLibros() {
         const searchTerm = document.getElementById('searchLibroInput').value.trim();
-        const materia = document.getElementById('filtroMateria').value.trim();
+        const materia = document.getElementById('filtroMateria').value;
         const curso = document.getElementById('filtroCurso').value;
-        const editorial = document.getElementById('filtroEditorial').value.trim();
+        const editorial = document.getElementById('filtroEditorial').value;
         const estado = document.getElementById('filtroEstado').value;
         const origen = document.getElementById('filtroOrigen').value;
         
@@ -1373,6 +1390,7 @@
                         🏢 Editorial: ${libro.editorial || '-'} | Estado: ${libro.estado || 'nuevo'}<br>
                         🏷️ Origen: ${libro.origen || 'IES'} | ${estadoPrestamo}
                         ${infoBaja}
+                        ${libro.incidencia ? `<br>⚠️ <strong style="color:#dc2626;">Incidencia:</strong> ${libro.incidencia}` : ''}                        
                     </div>
                     <div class="alumno-actions">
                         ${libro.activo === true ? `<button onclick="window.editarLibro('${libro.codigo_barras}')">✏️ Editar</button>` : ''}
@@ -1444,6 +1462,9 @@
             <div><label>Materia</label><input id="editMateria" value="${libro.materia || ''}"></div>
             <div><label>Editorial</label><input id="editEditorial" value="${libro.editorial || ''}"></div>
             <div><label>Signatura</label><input id="editSignatura" value="${libro.signatura || ''}"></div>
+            <div><label>Incidencia</label>
+                <textarea id="editIncidencia" rows="2" placeholder="Ej: Robado, perdido, devuelto dañado...">${libro.incidencia || ''}</textarea>
+            </div>            
             <div><label>Estado</label><select id="editEstado"><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
             <div><label>Origen</label><select id="editOrigen"><option>IES</option><option>AMPA</option><option>Donado</option></select></div>
             <div><label>Año compra</label><input type="number" id="editAnioCompra" value="${libro.fecha_compra ? libro.fecha_compra.slice(0,4) : ''}"></div>
@@ -1461,6 +1482,7 @@
                 signatura: document.getElementById('editSignatura').value,
                 estado: document.getElementById('editEstado').value,
                 origen: document.getElementById('editOrigen').value,
+                incidencia: document.getElementById('editIncidencia').value
                 fecha_compra: document.getElementById('editAnioCompra').value ? `${document.getElementById('editAnioCompra').value}-01-01` : null
             }).eq('codigo_barras', codigoBarras);
             alert('Libro actualizado');
