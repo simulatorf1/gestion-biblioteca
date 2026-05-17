@@ -178,60 +178,73 @@
             if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarAlumnosMejorado(); });
         });
     }
+
     async function buscarAlumnosMejorado() {
         const nombreRaw = document.getElementById('searchNombre').value.trim();
         const apellidosRaw = document.getElementById('searchApellidos').value.trim();
-        const curso = document.getElementById('searchCurso').value;
+        const cursoFiltro = document.getElementById('searchCurso').value;
         const codigoRaw = document.getElementById('searchCodigo').value.trim();
         
         const resultadosDiv = document.getElementById('resultadosBusqueda');
         
-        // Normalizar los textos de búsqueda
         const nombreBusq = normalizarTexto(nombreRaw);
         const apellidosBusq = normalizarTexto(apellidosRaw);
         
-        if (!nombreBusq && !apellidosBusq && !curso && !codigoRaw) {
+        if (!nombreBusq && !apellidosBusq && !cursoFiltro && !codigoRaw) {
             resultadosDiv.innerHTML = '<p style="color:#64748b; text-align:center;">Escribe algo para buscar</p>';
             return;
         }
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        // Obtener todos los alumnos con su historial del año actual
-        const { data: alumnos, error } = await supabase
-            .from('alumnos')
-            .select('*, historial_alumnos!inner(*)')
-            .eq('historial_alumnos.ano_academico_id', currentAnoId);
+        // 1. Obtener el historial de alumnos del año actual con los datos del alumno
+        let query = supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', currentAnoId);
+        
+        const { data: historiales, error } = await query;
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
             return;
         }
         
-        // Filtrar en JavaScript para poder normalizar tildes
-        let resultados = alumnos;
+        if (!historiales || historiales.length === 0) {
+            resultadosDiv.innerHTML = '<p>No hay alumnos en el año académico actual</p>';
+            return;
+        }
         
-        // Filtrar por código de usuario
+        // 2. Convertir a formato usable
+        let resultados = historiales.map(h => ({
+            id: h.alumnos.id,
+            nombre: h.alumnos.nombre,
+            apellidos: h.alumnos.apellidos,
+            codigo_usuario: h.alumnos.codigo_usuario,
+            curso: h.curso,
+            grupo: h.grupo,
+            beca: h.beca,
+            socio_ampa: h.socio_ampa
+        }));
+        
+        // 3. Filtrar por código de usuario
         if (codigoRaw) {
             resultados = resultados.filter(a => a.codigo_usuario && a.codigo_usuario.toString().includes(codigoRaw));
         }
         
-        // Filtrar por nombre (sin tildes)
+        // 4. Filtrar por nombre (sin tildes)
         if (nombreBusq) {
             resultados = resultados.filter(a => normalizarTexto(a.nombre || '').includes(nombreBusq));
         }
         
-        // Filtrar por apellidos (sin tildes)
+        // 5. Filtrar por apellidos (sin tildes)
         if (apellidosBusq) {
             resultados = resultados.filter(a => normalizarTexto(a.apellidos || '').includes(apellidosBusq));
         }
         
-        // Filtrar por curso (del historial)
-        if (curso) {
-            resultados = resultados.filter(a => {
-                const h = a.historial_alumnos;
-                return h && h.curso === curso;
-            });
+        // 6. Filtrar por curso
+        if (cursoFiltro) {
+            resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
         if (resultados.length === 0) {
@@ -246,97 +259,15 @@
             return;
         }
         
-        // Mostrar resultados
+        // 7. Mostrar resultados
         let html = `<h3>Resultados (${resultados.length})</h3>`;
         for (const alumno of resultados) {
-            const historial = alumno.historial_alumnos;
             html += `
                 <div class="alumno-row" onclick="window.editarAlumno(${alumno.id})">
                     <div class="alumno-info">
                         <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
-                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
-                        🆔 ID: ${alumno.id}
-                    </div>
-                    <div class="alumno-actions">
-                        <span class="edit-icon" onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})">✏️</span>
-                    </div>
-                </div>
-            `;
-        }
-        resultadosDiv.innerHTML = html;
-    }    
-    async function buscarAlumnos() {
-        const searchTerm = document.getElementById('searchInput').value.trim();
-        const resultadosDiv = document.getElementById('resultadosBusqueda');
-        
-        if (!searchTerm) {
-            resultadosDiv.innerHTML = '<p style="color:#64748b; text-align:center;">Escribe algo para buscar</p>';
-            return;
-        }
-        
-        resultadosDiv.innerHTML = '<p>Buscando...</p>';
-        
-        // Búsqueda por nombre, apellidos (si existe), codigo_usuario, o curso (desde historial)
-        let query = supabase
-            .from('alumnos')
-            .select('*, historial_alumnos!inner(*)')
-            .eq('historial_alumnos.ano_academico_id', currentAnoId);
-        
-        // Intentar búsqueda por número de código si es número
-        if (!isNaN(searchTerm) && searchTerm !== '') {
-            query = query.eq('codigo_usuario', parseInt(searchTerm));
-        } else {
-            // Búsqueda por texto
-            query = query.or(`nombre.ilike.%${searchTerm}%,apellidos.ilike.%${searchTerm}%`);
-            // También buscar por curso
-            const { data: porCurso } = await supabase
-                .from('historial_alumnos')
-                .select('alumno_id')
-                .eq('ano_academico_id', currentAnoId)
-                .ilike('curso', `%${searchTerm}%`);
-            
-            if(porCurso && porCurso.length > 0) {
-                const ids = porCurso.map(p => p.alumno_id);
-                query = query.or(`id.in.(${ids.join(',')})`);
-            }
-        }
-        
-        const { data: alumnos, error } = await query;
-        
-        if (error) {
-            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
-            return;
-        }
-        
-        if (!alumnos || alumnos.length === 0) {
-            resultadosDiv.innerHTML = `
-                <p>No se encontraron alumnos</p>
-                <button id="btnCrearDesdeBusqueda" class="success">➕ Crear nuevo alumno</button>
-            `;
-            const btnCrear = document.getElementById('btnCrearDesdeBusqueda');
-            if (btnCrear) {
-                btnCrear.onclick = function() { editarAlumno(null); };
-            }
-            return;
-        }
-        
-        // Mostrar resultados
-        let html = `<h3>Resultados (${alumnos.length})</h3>`;
-        for (const alumno of alumnos) {
-            // Obtener datos del historial actual
-            const { data: historial } = await supabase
-                .from('historial_alumnos')
-                .select('*')
-                .eq('alumno_id', alumno.id)
-                .eq('ano_academico_id', currentAnoId)
-                .single();
-            
-            html += `
-                <div class="alumno-row" onclick="window.editarAlumno(${alumno.id})">
-                    <div class="alumno-info">
-                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
-                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
-                        🆔 ID: ${alumno.id}
+                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso || '-'} ${alumno.grupo || ''}<br>
+                        ${alumno.beca ? '🎓 Becado | ' : ''}${alumno.socio_ampa ? '💰 Socio AMPA' : ''}
                     </div>
                     <div class="alumno-actions">
                         <span class="edit-icon" onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})">✏️</span>
@@ -346,6 +277,7 @@
         }
         resultadosDiv.innerHTML = html;
     }
+
     
     window.editarAlumno = async (alumnoId) => {
         currentEditingAlumnoId = alumnoId;
