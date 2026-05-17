@@ -468,6 +468,13 @@
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
                         <div><label>Código de usuario</label><input type="text" id="socioCodigo" placeholder="Ej: 202670001"></div>
+                        <div><label>Estado socio</label><select id="socioEstado">
+                            <option value="">Todos</option>
+                            <option value="socio">✅ Solo socios</option>
+                            <option value="no_socio">❌ Solo no socios</option>
+                            <option value="pagado">💰 Socios con pago realizado</option>
+                            <option value="pendiente">⚠️ Socios con pago pendiente</option>
+                        </select></div>                        
                     </div>
                     <button id="btnBuscarSocio" style="margin-top:10px;">Buscar</button>
                     <button id="btnLimpiarSocio" class="secondary" style="margin-top:10px;">Limpiar</button>
@@ -494,11 +501,13 @@
             if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarSociosMejorado(); });
         });
     }
+
     async function buscarSociosMejorado() {
         const nombreRaw = document.getElementById('socioNombre').value.trim();
         const apellidosRaw = document.getElementById('socioApellidos').value.trim();
         const cursoFiltro = document.getElementById('socioCurso').value;
         const codigoRaw = document.getElementById('socioCodigo').value.trim();
+        const estadoFiltro = document.getElementById('socioEstado').value;
         
         const resultadosDiv = document.getElementById('resultadosSocios');
         
@@ -530,6 +539,7 @@
             beca: h.beca
         }));
         
+        // Filtros básicos
         if (codigoRaw) {
             resultados = resultados.filter(a => {
                 const codigoAlumno = a.codigo_usuario ? String(a.codigo_usuario) : '';
@@ -546,13 +556,7 @@
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
-        if (resultados.length === 0) {
-            resultadosDiv.innerHTML = '<p>No se encontraron alumnos</p>';
-            return;
-        }
-        
-        let html = `<h3>Resultados (${resultados.length})</h3>`;
-        
+        // Obtener información de socio para cada resultado
         for (const alumno of resultados) {
             const { data: socio } = await supabaseDebug
                 .from('socios')
@@ -561,27 +565,49 @@
                 .eq('ano_academico_id', anoId)
                 .maybeSingle();
             
-            const esSocio = socio && socio.activo !== false;
-            const haPagado = socio?.pagado || false;
-            
+            alumno.esSocio = socio && socio.activo !== false;
+            alumno.haPagado = socio?.pagado || false;
+            alumno.n_socio = socio?.n_socio || null;
+            alumno.fecha_pago = socio?.fecha_pago || null;
+        }
+        
+        // Filtrar por estado socio
+        if (estadoFiltro === 'socio') {
+            resultados = resultados.filter(a => a.esSocio === true);
+        } else if (estadoFiltro === 'no_socio') {
+            resultados = resultados.filter(a => a.esSocio === false);
+        } else if (estadoFiltro === 'pagado') {
+            resultados = resultados.filter(a => a.haPagado === true);
+        } else if (estadoFiltro === 'pendiente') {
+            resultados = resultados.filter(a => a.esSocio === true && a.haPagado === false);
+        }
+        
+        if (resultados.length === 0) {
+            resultadosDiv.innerHTML = '<p>No se encontraron alumnos</p>';
+            return;
+        }
+        
+        let html = `<h3>Resultados (${resultados.length})</h3>`;
+        
+        for (const alumno of resultados) {
             html += `
                 <div class="alumno-row">
                     <div class="alumno-info">
                         <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
                         📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso} ${alumno.grupo || ''}<br>
-                        ${esSocio ? (haPagado ? '✅ Socio - Pago registrado' : '⚠️ Socio - Pago pendiente') : '❌ No es socio'}
-                        ${socio ? `<br>📅 Fecha pago: ${socio.fecha_pago || 'No registrada'} | Nº Socio: ${socio.n_socio || '-'}` : ''}
+                        ${alumno.esSocio ? (alumno.haPagado ? '✅ Socio - Pago registrado' : '⚠️ Socio - Pago pendiente') : '❌ No es socio'}
+                        ${alumno.n_socio ? `<br>📅 Nº Socio: ${alumno.n_socio} | Fecha pago: ${alumno.fecha_pago || 'No registrada'}` : ''}
                     </div>
                     <div class="alumno-actions">
-                        ${!esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
-                        ${esSocio ? `<button onclick="window.editarPagoSocio(${socio.id}, ${alumno.id})">✏️ Editar pago</button>` : ''}
-                        ${esSocio ? `<button class="danger" onclick="window.darBajaSocio(${socio.id}, ${alumno.id})">🗑️ Dar baja socio</button>` : ''}
+                        ${!alumno.esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
+                        ${alumno.esSocio ? `<button onclick="window.editarPagoSocio(${alumno.id})">✏️ Editar pago</button>` : ''}
+                        ${alumno.esSocio ? `<button class="danger" onclick="window.darBajaSocio(${alumno.id})">🗑️ Dar baja socio</button>` : ''}
                     </div>
                 </div>
             `;
         }
         resultadosDiv.innerHTML = html;
-    }    
+    }
     async function buscarSocios() {
         const searchTerm = document.getElementById('searchSocioInput').value.trim();
         const resultadosDiv = document.getElementById('resultadosSocios');
