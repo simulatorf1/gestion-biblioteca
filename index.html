@@ -1191,23 +1191,19 @@
         if (!confirm("¿Confirmas dar de baja este libro?")) return;
         
         // Actualizar libro (activo = false)
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('libros')
             .update({ activo: false })
-            .eq('codigo_barras', codigoBarras);
+            .eq('codigo_barras', codigoBarras)
+            .select();
         
         if (error) {
             alert("Error al dar de baja: " + error.message);
+            console.error("Error update:", error);
             return;
         }
         
-        // Registrar la baja en tabla bajas_libros (opcional)
-        await supabase.from('bajas_libros').insert({
-            libro_codigo: codigoBarras,
-            motivo: motivo,
-            fecha_baja: new Date().toISOString().slice(0,10)
-        });
-        
+        console.log("Libro actualizado:", data);
         alert("✅ Libro dado de baja correctamente");
         buscarLibros(); // Refrescar lista
     };
