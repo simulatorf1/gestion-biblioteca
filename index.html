@@ -461,20 +461,44 @@
         // Mostrar resultados
         let html = `<h3>Resultados (${resultados.length})</h3>`;
         for (const alumno of resultados) {
+            // Obtener libros prestados actualmente
+            const { data: prestamos } = await supabase
+                .from('prestamos')
+                .select('*, libros(*)')
+                .eq('alumno_id', alumno.id)
+                .eq('entregado', false);
+            
+            const librosHtml = prestamos && prestamos.length > 0 
+                ? prestamos.map(p => `
+                    <div style="background:#fef3c7; padding:8px; margin:5px 0; border-radius:8px;">
+                        📖 <strong>${p.libros?.titulo || 'Sin título'}</strong><br>
+                        🔢 Código: ${p.libros?.codigo_barras || 'Sin código'}<br>
+                        📅 Préstamo: ${p.fecha_prestamo || '-'}
+                    </div>
+                `).join('')
+                : '<p>No tiene libros prestados</p>';
+            
             html += `
                 <div class="alumno-row" onclick="window.editarAlumno(${alumno.id})">
                     <div class="alumno-info">
                         <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
                         📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso || '-'} ${alumno.grupo || ''}<br>
-                        ${alumno.beca ? '🎓 Becado | ' : ''}${alumno.socio_ampa ? '💰 Socio AMPA' : ''}
+                        📞 Teléfono: ${alumno.telefono || '-'}<br>
+                        🎓 Beca: ${alumno.beca ? 'Sí' : 'No'} | 💰 Socio AMPA: ${alumno.socio_ampa ? 'Sí' : 'No'}<br>
+                        🌍 Bilingüe: ${alumno.bilingue ? 'Sí' : 'No'} | 📚 Diversificación: ${alumno.diversificacion ? 'Sí' : 'No'}
                     </div>
                     <div class="alumno-actions">
                         <span class="edit-icon" onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})">✏️</span>
                     </div>
                 </div>
+                <div style="background:#f1f5f9; padding:12px; margin-bottom:16px; border-radius:12px;">
+                    <strong>📚 Libros prestados:</strong>
+                    ${librosHtml}
+                </div>
             `;
         }
         resultadosDiv.innerHTML = html;
+
     }
     
     window.editarAlumno = async (alumnoId) => {
@@ -926,7 +950,11 @@
             codigo_usuario: h.alumnos.codigo_usuario,
             curso: h.curso,
             grupo: h.grupo,
-            beca: h.beca
+            beca: h.beca,
+            socio_ampa: h.socio_ampa,
+            telefono: h.telefono,
+            bilingue: h.bilingue,
+            diversificacion: h.diversificacion
         }));
         
         // Filtros básicos
