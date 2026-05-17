@@ -142,7 +142,14 @@
                 <div class="flex"><h2>👨‍🎓 Buscar Alumno</h2><button id="btnNuevoAlumno" class="success">➕ Nuevo Alumno</button></div>
                 <div class="search-filters">
                     <div class="form-grid">
-                        <div><label>🔍 Buscar por</label><input type="text" id="searchInput" placeholder="Nombre, apellidos, código o curso..."></div>
+                        <div><label>🔍 Nombre</label><input type="text" id="searchNombre" placeholder="Ej: María"></div>
+                        <div><label>🔍 Apellidos</label><input type="text" id="searchApellidos" placeholder="Ej: García López"></div>
+                        <div><label>Curso</label><select id="searchCurso">
+                            <option value="">Todos</option>
+                            <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
+                            <option>1BAC</option><option>2BAC</option>
+                        </select></div>
+                        <div><label>Código de usuario</label><input type="text" id="searchCodigo" placeholder="Ej: 202670001"></div>
                     </div>
                     <button id="btnBuscar" style="margin-top:10px;">Buscar</button>
                     <button id="btnLimpiar" class="secondary" style="margin-top:10px;">Limpiar</button>
@@ -155,17 +162,109 @@
         document.getElementById('mainPanel').innerHTML = html;
         
         document.getElementById('btnNuevoAlumno').onclick = () => editarAlumno(null);
-        document.getElementById('btnBuscar').onclick = () => buscarAlumnos();
+        document.getElementById('btnBuscar').onclick = () => buscarAlumnosMejorado();
         document.getElementById('btnLimpiar').onclick = () => {
-            document.getElementById('searchInput').value = '';
+            document.getElementById('searchNombre').value = '';
+            document.getElementById('searchApellidos').value = '';
+            document.getElementById('searchCurso').value = '';
+            document.getElementById('searchCodigo').value = '';
             document.getElementById('resultadosBusqueda').innerHTML = '<p style="color:#64748b; text-align:center;">🔎 Usa el buscador para encontrar alumnos</p>';
         };
-        // Permitir buscar con Enter
-        document.getElementById('searchInput').addEventListener('keypress', (e) => {
-            if(e.key === 'Enter') buscarAlumnos();
+        
+        // Permitir buscar con Enter en cualquier campo
+        const inputs = ['searchNombre', 'searchApellidos', 'searchCurso', 'searchCodigo'];
+        inputs.forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarAlumnosMejorado(); });
         });
     }
-    
+    async function buscarAlumnosMejorado() {
+        const nombreRaw = document.getElementById('searchNombre').value.trim();
+        const apellidosRaw = document.getElementById('searchApellidos').value.trim();
+        const curso = document.getElementById('searchCurso').value;
+        const codigoRaw = document.getElementById('searchCodigo').value.trim();
+        
+        const resultadosDiv = document.getElementById('resultadosBusqueda');
+        
+        // Normalizar los textos de búsqueda
+        const nombreBusq = normalizarTexto(nombreRaw);
+        const apellidosBusq = normalizarTexto(apellidosRaw);
+        
+        if (!nombreBusq && !apellidosBusq && !curso && !codigoRaw) {
+            resultadosDiv.innerHTML = '<p style="color:#64748b; text-align:center;">Escribe algo para buscar</p>';
+            return;
+        }
+        
+        resultadosDiv.innerHTML = '<p>Buscando...</p>';
+        
+        // Obtener todos los alumnos con su historial del año actual
+        const { data: alumnos, error } = await supabase
+            .from('alumnos')
+            .select('*, historial_alumnos!inner(*)')
+            .eq('historial_alumnos.ano_academico_id', currentAnoId);
+        
+        if (error) {
+            resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            return;
+        }
+        
+        // Filtrar en JavaScript para poder normalizar tildes
+        let resultados = alumnos;
+        
+        // Filtrar por código de usuario
+        if (codigoRaw) {
+            resultados = resultados.filter(a => a.codigo_usuario && a.codigo_usuario.toString().includes(codigoRaw));
+        }
+        
+        // Filtrar por nombre (sin tildes)
+        if (nombreBusq) {
+            resultados = resultados.filter(a => normalizarTexto(a.nombre || '').includes(nombreBusq));
+        }
+        
+        // Filtrar por apellidos (sin tildes)
+        if (apellidosBusq) {
+            resultados = resultados.filter(a => normalizarTexto(a.apellidos || '').includes(apellidosBusq));
+        }
+        
+        // Filtrar por curso (del historial)
+        if (curso) {
+            resultados = resultados.filter(a => {
+                const h = a.historial_alumnos;
+                return h && h.curso === curso;
+            });
+        }
+        
+        if (resultados.length === 0) {
+            resultadosDiv.innerHTML = `
+                <p>No se encontraron alumnos</p>
+                <button id="btnCrearDesdeBusqueda" class="success">➕ Crear nuevo alumno</button>
+            `;
+            const btnCrear = document.getElementById('btnCrearDesdeBusqueda');
+            if (btnCrear) {
+                btnCrear.onclick = function() { editarAlumno(null); };
+            }
+            return;
+        }
+        
+        // Mostrar resultados
+        let html = `<h3>Resultados (${resultados.length})</h3>`;
+        for (const alumno of resultados) {
+            const historial = alumno.historial_alumnos;
+            html += `
+                <div class="alumno-row" onclick="window.editarAlumno(${alumno.id})">
+                    <div class="alumno-info">
+                        <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                        📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
+                        🆔 ID: ${alumno.id}
+                    </div>
+                    <div class="alumno-actions">
+                        <span class="edit-icon" onclick="event.stopPropagation(); window.editarAlumno(${alumno.id})">✏️</span>
+                    </div>
+                </div>
+            `;
+        }
+        resultadosDiv.innerHTML = html;
+    }    
     async function buscarAlumnos() {
         const searchTerm = document.getElementById('searchInput').value.trim();
         const resultadosDiv = document.getElementById('resultadosBusqueda');
@@ -1317,7 +1416,10 @@
             cerrarScanner();
         });
     }
-    
+    function normalizarTexto(texto) {
+        if (!texto) return '';
+        return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    }    
     function cerrarScanner() {
         scannerActivo = false;
         if (html5QrCode && html5QrCode.isScanning) {
