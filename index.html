@@ -1190,22 +1190,18 @@
         
         if (!confirm("¿Confirmas dar de baja este libro?")) return;
         
-        // Actualizar libro usando supabaseDebug
-        const { data, error } = await supabaseDebug
+        const { error } = await supabaseDebug
             .from('libros')
             .update({ activo: false })
-            .eq('codigo_barras', codigoBarras)
-            .select();
+            .eq('codigo_barras', codigoBarras);
         
         if (error) {
             alert("Error al dar de baja: " + error.message);
-            console.error("Error:", error);
             return;
         }
         
-        console.log("Libro actualizado:", data);
         alert("✅ Libro dado de baja correctamente");
-        buscarLibros(); // Refrescar lista
+        buscarLibros();
     };
     
     window.verPrestamoLibro = async (codigoBarras) => {
