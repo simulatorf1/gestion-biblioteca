@@ -179,7 +179,22 @@
         });
     }
 
+
     async function buscarAlumnosMejorado() {
+        // Obtener el año activo directamente desde la BD
+        const { data: anoActivo, error: anoError } = await supabase
+            .from('ano_academico')
+            .select('id')
+            .eq('activo', true)
+            .single();
+        
+        if (anoError) {
+            console.error("Error obteniendo año activo:", anoError);
+            return;
+        }
+        
+        const anoId = anoActivo.id;
+        
         const nombreRaw = document.getElementById('searchNombre').value.trim();
         const apellidosRaw = document.getElementById('searchApellidos').value.trim();
         const cursoFiltro = document.getElementById('searchCurso').value;
@@ -197,13 +212,11 @@
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        // 1. Obtener el historial de alumnos del año actual con los datos del alumno
-        let query = supabase
+        // Consultar historial del año activo con datos del alumno
+        const { data: historiales, error } = await supabase
             .from('historial_alumnos')
             .select('*, alumnos(*)')
-            .eq('ano_academico_id', currentAnoId);
-        
-        const { data: historiales, error } = await query;
+            .eq('ano_academico_id', anoId);
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
@@ -215,7 +228,7 @@
             return;
         }
         
-        // 2. Convertir a formato usable
+        // Convertir a formato usable
         let resultados = historiales.map(h => ({
             id: h.alumnos.id,
             nombre: h.alumnos.nombre,
@@ -227,22 +240,22 @@
             socio_ampa: h.socio_ampa
         }));
         
-        // 3. Filtrar por código de usuario
+        // Filtrar por código de usuario
         if (codigoRaw) {
             resultados = resultados.filter(a => a.codigo_usuario && a.codigo_usuario.toString().includes(codigoRaw));
         }
         
-        // 4. Filtrar por nombre (sin tildes)
+        // Filtrar por nombre
         if (nombreBusq) {
             resultados = resultados.filter(a => normalizarTexto(a.nombre || '').includes(nombreBusq));
         }
         
-        // 5. Filtrar por apellidos (sin tildes)
+        // Filtrar por apellidos
         if (apellidosBusq) {
             resultados = resultados.filter(a => normalizarTexto(a.apellidos || '').includes(apellidosBusq));
         }
         
-        // 6. Filtrar por curso
+        // Filtrar por curso
         if (cursoFiltro) {
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
@@ -259,7 +272,7 @@
             return;
         }
         
-        // 7. Mostrar resultados
+        // Mostrar resultados
         let html = `<h3>Resultados (${resultados.length})</h3>`;
         for (const alumno of resultados) {
             html += `
@@ -277,7 +290,6 @@
         }
         resultadosDiv.innerHTML = html;
     }
-
     
     window.editarAlumno = async (alumnoId) => {
         currentEditingAlumnoId = alumnoId;
