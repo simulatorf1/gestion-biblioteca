@@ -178,14 +178,97 @@
             if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarAlumnosMejorado(); });
         });
     }
-
+    async function buscarClaseParaEntrega() {
+        const curso = document.getElementById('filtroCursoEntrega').value;
+        const grupo = document.getElementById('filtroGrupoEntrega').value.trim();
+        const resultadoDiv = document.getElementById('resultadoEntrega');
+        const entregaInfoDiv = document.getElementById('entregaInfo');
+        
+        if (!curso) {
+            resultadoDiv.innerHTML = '<p>Selecciona un curso</p>';
+            return;
+        }
+        
+        resultadoDiv.innerHTML = '<p>Buscando...</p>';
+        entregaInfoDiv.innerHTML = '';
+        
+        // Buscar alumnos del curso/grupo
+        let query = supabase
+            .from('historial_alumnos')
+            .select('*, alumnos(*)')
+            .eq('ano_academico_id', currentAnoId)
+            .eq('curso', curso);
+        
+        if (grupo) query = query.eq('grupo', grupo);
+        
+        const { data: alumnos } = await query;
+        
+        if (!alumnos || alumnos.length === 0) {
+            resultadoDiv.innerHTML = '<p>No hay alumnos en esta clase</p>';
+            return;
+        }
+        
+        // Obtener estado de entrega para cada alumno
+        let html = `<h3>Clase: ${curso} ${grupo} (${alumnos.length} alumnos)</h3>
+            <table style="width:100%; border-collapse:collapse;">
+                <thead><tr style="background:#2563eb; color:white;">
+                    <th>Alumno</th><th>Curso</th><th>Libros prestados</th><th>Estado entrega</th><th>Acción</th>
+                </tr></thead>
+                <tbody>`;
+        
+        for (const h of alumnos) {
+            const alumno = h.alumnos;
+            const { count: totalPrestamos } = await supabase
+                .from('prestamos')
+                .select('*', { count: 'exact', head: true })
+                .eq('alumno_id', alumno.id)
+                .eq('entregado', false);
+            
+            const entregado = h.lote_entregado || false;
+            const colorFila = entregado ? 'style="background:#dcfce7;"' : '';
+            
+            html += `<tr ${colorFila}>
+                <td>${alumno.nombre} ${alumno.apellidos || ''}</td>
+                <td>${h.curso} ${h.grupo || ''}</td>
+                <td>${totalPrestamos || 0}</td>
+                <td>${entregado ? '✅ Entregado' : '⏳ Pendiente'}</td>
+                <td>${!entregado && totalPrestamos > 0 ? `<button onclick="confirmarEntregaClase(${alumno.id}, '${alumno.nombre}')">✅ Marcar entregado</button>` : ''}</td>
+            </tr>`;
+        }
+        html += `</tbody></table>`;
+        resultadoDiv.innerHTML = html;
+    }
+    
+    window.confirmarEntregaClase = async (alumnoId, nombre) => {
+        if(confirm(`¿Confirmar entrega de lote para ${nombre}?`)) {
+            await supabase
+                .from('historial_alumnos')
+                .update({ lote_entregado: true, fecha_entrega: new Date().toISOString().slice(0,10) })
+                .eq('alumno_id', alumnoId)
+                .eq('ano_academico_id', currentAnoId);
+            
+            alert(`✅ Entrega confirmada para ${nombre}`);
+            buscarClaseParaEntrega(); // Refrescar la lista
+        }
+    };
     async function mostrarEntregarLote() {
         let html = `
             <div style="margin-top:20px;">
                 <h3>✅ Entregar lote (confirmar recogida y firma)</h3>
                 <div class="search-filters">
-                    <input type="text" id="buscarAlumnoEntrega" placeholder="Buscar alumno por nombre o código..." style="width:100%;">
-                    <button id="btnBuscarAlumnoEntrega">Buscar alumno</button>
+                    <div class="form-grid">
+                        <div><label>Buscar por alumno</label><input type="text" id="buscarAlumnoEntrega" placeholder="Nombre o código..." style="width:100%;"></div>
+                        <div><label>O filtrar por clase</label>
+                            <select id="filtroCursoEntrega">
+                                <option value="">Selecciona curso</option>
+                                <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
+                                <option>1BAC</option><option>2BAC</option>
+                            </select>
+                        </div>
+                        <div><label>Grupo</label><input type="text" id="filtroGrupoEntrega" placeholder="Ej: A, B, C" style="width:100%;"></div>
+                    </div>
+                    <button id="btnBuscarClaseEntrega">Buscar clase</button>
+                    <button id="btnBuscarAlumnoEntregaBtn" class="secondary">Buscar alumno</button>
                 </div>
                 <div id="resultadoEntrega" style="margin-top:10px;"></div>
                 <div id="entregaInfo" style="margin-top:20px;"></div>
@@ -193,7 +276,8 @@
         `;
         document.getElementById('subpanelPrestamos').innerHTML = html;
         
-        document.getElementById('btnBuscarAlumnoEntrega').onclick = () => buscarAlumnoParaEntrega();
+        document.getElementById('btnBuscarClaseEntrega').onclick = () => buscarClaseParaEntrega();
+        document.getElementById('btnBuscarAlumnoEntregaBtn').onclick = () => buscarAlumnoParaEntrega();
         document.getElementById('buscarAlumnoEntrega').addEventListener('keypress', (e) => {
             if(e.key === 'Enter') buscarAlumnoParaEntrega();
         });
