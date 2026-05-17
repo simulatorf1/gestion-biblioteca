@@ -1122,6 +1122,7 @@
         const resultadosDiv = document.getElementById('resultadosLibros');
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         console.log("Filtros aplicados:", { searchTerm, materia, curso, editorial, estado, origen });
+        
         let query = supabase.from('libros').select('*');
         const verSoloBaja = document.getElementById('verLibrosInactivos')?.checked;
         
@@ -1154,9 +1155,8 @@
         
         let html = `<h3>Resultados (${libros.length})</h3>`;
         
-
         for (const libro of libros) {
-            console.log("Libro:", libro);  // <--- AÑADE ESTA LÍNEA
+            console.log("Libro:", libro);
             
             // Verificar si está prestado
             const { data: prestamo } = await supabase
@@ -1168,6 +1168,20 @@
             
             const estadoPrestamo = prestamo ? `🔴 Prestado a: ${prestamo.alumnos?.nombre}` : '🟢 Disponible';
             
+            // Obtener datos de baja si el libro está inactivo
+            let infoBaja = '';
+            if (libro.activo === false) {
+                const { data: baja } = await supabase
+                    .from('bajas_libros')
+                    .select('motivo, fecha_baja')
+                    .eq('libro_codigo', libro.codigo_barras)
+                    .maybeSingle();
+                
+                if (baja) {
+                    infoBaja = `<br>📅 Baja: ${baja.fecha_baja || '-'} | Motivo: ${baja.motivo || '-'}`;
+                }
+            }
+            
             html += `
                 <div class="alumno-row">
                     <div class="alumno-info">
@@ -1176,6 +1190,7 @@
                         📚 Materia: ${libro.materia || '-'} | Curso: ${libro.curso_para || '-'}<br>
                         🏢 Editorial: ${libro.editorial || '-'} | Estado: ${libro.estado || 'nuevo'}<br>
                         🏷️ Origen: ${libro.origen || 'IES'} | ${estadoPrestamo}
+                        ${infoBaja}
                     </div>
                     <div class="alumno-actions">
                         ${libro.activo === true ? `<button onclick="window.editarLibro('${libro.codigo_barras}')">✏️ Editar</button>` : ''}
@@ -1193,7 +1208,8 @@
         
         if (!confirm("¿Confirmas dar de baja este libro?")) return;
         
-        const { error } = await supabaseDebug
+        // Actualizar libro a inactivo
+        const { error } = await supabase
             .from('libros')
             .update({ activo: false })
             .eq('codigo_barras', codigoBarras);
@@ -1202,6 +1218,13 @@
             alert("Error al dar de baja: " + error.message);
             return;
         }
+        
+        // Registrar la baja con motivo y fecha
+        await supabase.from('bajas_libros').insert({
+            libro_codigo: codigoBarras,
+            motivo: motivo,
+            fecha_baja: new Date().toISOString().slice(0,10)
+        });
         
         alert("✅ Libro dado de baja correctamente");
         buscarLibros();
