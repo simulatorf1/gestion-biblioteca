@@ -771,6 +771,7 @@
                         <div><label>Editorial</label><input type="text" id="filtroEditorial" placeholder="Editorial"></div>
                         <div><label>Estado</label><select id="filtroEstado"><option value="">Todos</option><option>nuevo</option><option>usado</option><option>desgastado</option></select></div>
                         <div><label>Origen</label><select id="filtroOrigen"><option value="">Todos</option><option>AMPA</option><option>IES</option><option>Donado</option></select></div>
+                        <div><label><input type="checkbox" id="verLibrosInactivos"> 📋 Mostrar libros dados de baja</label></div>                        
                     </div>
                     <button id="btnBuscarLibro">Buscar</button>
                     <button id="btnLimpiarLibro" class="secondary">Limpiar</button>
@@ -1122,6 +1123,10 @@
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         console.log("Filtros aplicados:", { searchTerm, materia, curso, editorial, estado, origen });
         let query = supabase.from('libros').select('*');
+        const verInactivos = document.getElementById('verLibrosInactivos')?.checked;
+        if (!verInactivos) {
+            query = query.eq('activo', true);
+        }
         
         if (searchTerm) {
             query = query.or(`titulo.ilike.%${searchTerm}%,signatura.ilike.%${searchTerm}%,codigo_barras.ilike.%${searchTerm}%`);
@@ -1171,6 +1176,7 @@
                     </div>
                     <div class="alumno-actions">
                         <button onclick="window.editarLibro('${libro.codigo_barras}')">✏️ Editar</button>
+                        <button class="danger" onclick="window.darBajaLibro('${libro.codigo_barras}')">🗑️ Dar baja</button>
                         ${prestamo ? `<button class="secondary" onclick="window.verPrestamoLibro('${libro.codigo_barras}')">👤 Ver quién lo tiene</button>` : ''}
                     </div>
                 </div>
@@ -1178,6 +1184,39 @@
         }
         resultadosDiv.innerHTML = html;
     }
+    window.darBajaLibro = async (codigoBarras) => {
+        const motivo = prompt("Motivo de la baja (ej: pérdida, rotura, extraviado):");
+        if (!motivo) return;
+        
+        if (!confirm("¿Confirmas dar de baja este libro?")) return;
+        
+        // Actualizar libro
+        const { error } = await supabaseDebug
+            .from('libros')
+            .update({ activo: false })
+            .eq('codigo_barras', codigoBarras);
+        
+        if (error) {
+            alert("Error: " + error.message);
+            return;
+        }
+        
+        // Registrar la baja en tabla de bajas_libros
+        const { data: libro } = await supabaseDebug
+            .from('libros')
+            .select('id')
+            .eq('codigo_barras', codigoBarras)
+            .single();
+        
+        await supabaseDebug.from('bajas_libros').insert({
+            libro_id: libro.id,
+            motivo: motivo,
+            fecha_baja: new Date().toISOString().slice(0,10)
+        });
+        
+        alert("✅ Libro dado de baja correctamente");
+        buscarLibros(); // Refrescar lista
+    };
     
     window.verPrestamoLibro = async (codigoBarras) => {
         const { data: prestamo } = await supabase
