@@ -1444,7 +1444,6 @@
         }
         
         const alumno = alumnos[0];
-        alumnoSeleccionado = alumno;
         
         // Obtener datos del historial actual
         const { data: historial } = await supabase
@@ -1454,18 +1453,70 @@
             .eq('ano_academico_id', currentAnoId)
             .single();
         
+        const esSocio = historial?.socio_ampa || false;
+        const tieneBeca = historial?.beca || false;
+        const puedePrestar = esSocio || tieneBeca;
+        
+        // Determinar color del mensaje
+        let avisoHtml = '';
+        if (!puedePrestar) {
+            avisoHtml = `
+                <div style="background:#fee2e2; border-left:4px solid #dc2626; padding:12px; margin-top:12px; border-radius:8px;">
+                    <strong>⚠️ ATENCIÓN</strong><br>
+                    Este alumno NO es socio del AMPA y NO tiene beca.<br>
+                    ¿Estás seguro de que quieres prestarle libros?
+                    <div class="flex" style="margin-top:10px;">
+                        <button id="btnAutorizarPrestamo" style="background:#dc2626;">✅ Autorizar y continuar</button>
+                        <button id="btnCancelarPrestamo" class="secondary">❌ Cancelar</button>
+                    </div>
+                </div>
+            `;
+        }
+        
         resultadoDiv.innerHTML = `
-            <div class="alumno-row">
+            <div class="alumno-row" style="${puedePrestar ? 'border-left-color:#10b981;' : 'border-left-color:#dc2626;'}">
                 <div class="alumno-info">
-                    <strong>✅ Alumno seleccionado: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                    <strong>✅ Alumno: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
                     📋 Código: ${alumno.codigo_usuario} | Curso: ${historial?.curso || '-'} ${historial?.grupo || ''}<br>
-                    ${historial?.beca ? '🎓 Becado | ' : ''}${historial?.socio_ampa ? '💰 Socio AMPA' : ''}
+                    ${historial?.beca ? '🎓 <strong style="color:#10b981;">Becado</strong> | ' : '🎓 <strong style="color:#dc2626;">No becado</strong> | '}
+                    ${historial?.socio_ampa ? '💰 <strong style="color:#10b981;">Socio AMPA</strong>' : '💰 <strong style="color:#dc2626;">No socio AMPA</strong>'}
                 </div>
             </div>
+            ${avisoHtml}
         `;
         
-        document.getElementById('btnEscanearLibroPrestamo').disabled = false;
-        document.getElementById('btnGuardarPrestamo').disabled = false;
+        // Si puede prestar directamente, habilitar botones
+        if (puedePrestar) {
+            alumnoSeleccionado = alumno;
+            document.getElementById('btnEscanearLibroPrestamo').disabled = false;
+            document.getElementById('btnGuardarPrestamo').disabled = false;
+        } else {
+            // Esperar autorización
+            const btnAutorizar = document.getElementById('btnAutorizarPrestamo');
+            const btnCancelar = document.getElementById('btnCancelarPrestamo');
+            
+            if (btnAutorizar) {
+                btnAutorizar.onclick = function() {
+                    alumnoSeleccionado = alumno;
+                    document.getElementById('btnEscanearLibroPrestamo').disabled = false;
+                    document.getElementById('btnGuardarPrestamo').disabled = false;
+                    resultadoDiv.innerHTML = `
+                        <div class="alumno-row" style="border-left-color:#f59e0b;">
+                            <div class="alumno-info">
+                                <strong>✅ Alumno autorizado: ${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
+                                ⚠️ Préstamo autorizado manualmente
+                            </div>
+                        </div>
+                    `;
+                };
+            }
+            if (btnCancelar) {
+                btnCancelar.onclick = function() {
+                    resultadoDiv.innerHTML = '<p>Préstamo cancelado</p>';
+                    alumnoSeleccionado = null;
+                };
+            }
+        }
     }
     
     function actualizarListaLotePrestamo() {
