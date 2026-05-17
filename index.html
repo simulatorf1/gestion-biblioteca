@@ -206,6 +206,9 @@
         const apellidosBusq = normalizarTexto(apellidosRaw);
         
         if (!nombreBusq && !apellidosBusq && !cursoFiltro && !codigoRaw) {
+            // Mostrar todos sin filtrar
+            console.log("Mostrando todos los alumnos");
+        } else if (!nombreBusq && !apellidosBusq && !cursoFiltro && !codigoRaw) {
             resultadosDiv.innerHTML = '<p style="color:#64748b; text-align:center;">Escribe algo para buscar</p>';
             return;
         }
@@ -242,7 +245,10 @@
         
         // Filtrar por código de usuario
         if (codigoRaw) {
-            resultados = resultados.filter(a => a.codigo_usuario && a.codigo_usuario.toString().includes(codigoRaw));
+            resultados = resultados.filter(a => {
+                const codigoStr = a.codigo_usuario ? a.codigo_usuario.toString() : '';
+                return codigoStr.includes(codigoRaw);
+            });
         }
         
         // Filtrar por nombre
