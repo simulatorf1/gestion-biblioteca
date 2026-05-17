@@ -1190,8 +1190,8 @@
         
         if (!confirm("¿Confirmas dar de baja este libro?")) return;
         
-        // Actualizar libro (activo = false)
-        const { data, error } = await supabase
+        // Actualizar libro usando supabaseDebug
+        const { data, error } = await supabaseDebug
             .from('libros')
             .update({ activo: false })
             .eq('codigo_barras', codigoBarras)
@@ -1199,7 +1199,7 @@
         
         if (error) {
             alert("Error al dar de baja: " + error.message);
-            console.error("Error update:", error);
+            console.error("Error:", error);
             return;
         }
         
