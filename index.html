@@ -349,24 +349,46 @@
         
         document.getElementById('guardarAlumnoBtn').onclick = async () => {
             let nuevoAlumnoId = alumnoId;
+            
             if(!alumnoId) {
+                // 1. Crear el alumno
                 const { data: nuevo, error } = await supabase.from('alumnos').insert({ 
                     nombre: document.getElementById('editNombre').value,
                     apellidos: document.getElementById('editApellidos').value
                 }).select().single();
                 if(error) { alert('Error: ' + error.message); return; }
                 nuevoAlumnoId = nuevo.id;
+                
+                // 2. Crear su historial para el año activo
+                const historialDataCompleto = {
+                    alumno_id: nuevoAlumnoId,
+                    ano_academico_id: currentAnoId,
+                    curso: document.getElementById('editCurso').value,
+                    grupo: document.getElementById('editGrupo').value || '',
+                    telefono: document.getElementById('editTelefono').value || '',
+                    bilingue: document.getElementById('editBilingue').checked,
+                    beca: document.getElementById('editBeca').checked,
+                    socio_ampa: false,
+                    diversificacion: document.getElementById('editDiversificacion').checked,
+                    donante: false,
+                    observaciones: document.getElementById('editObservaciones').value || '',
+                    activo: true
+                };
+                const { error: histError } = await supabase.from('historial_alumnos').insert(historialDataCompleto);
+                if(histError) console.error("Error al crear historial:", histError);
+                
                 alert(`Alumno creado con código: ${nuevo.codigo_usuario}`);
-            } else {
-                await supabase.from('alumnos').update({ 
-                    nombre: document.getElementById('editNombre').value,
-                    apellidos: document.getElementById('editApellidos').value
-                }).eq('id', alumnoId);
+                cargarAlumnos();
+                return;
             }
             
+            // Si es edición (alumno ya existe)
+            await supabase.from('alumnos').update({ 
+                nombre: document.getElementById('editNombre').value,
+                apellidos: document.getElementById('editApellidos').value
+            }).eq('id', alumnoId);
+            
             const historialData = {
-                alumno_id: nuevoAlumnoId,
-                ano_academico_id: currentAnoId,
                 curso: document.getElementById('editCurso').value,
                 grupo: document.getElementById('editGrupo').value,
                 telefono: document.getElementById('editTelefono').value,
@@ -378,8 +400,16 @@
                 observaciones: document.getElementById('editObservaciones').value,
                 activo: true
             };
-            if (historialActual?.id) await supabase.from('historial_alumnos').update(historialData).eq('id', historialActual.id);
-            else await supabase.from('historial_alumnos').insert(historialData);
+            
+            if (historialActual?.id) {
+                await supabase.from('historial_alumnos').update(historialData).eq('id', historialActual.id);
+            } else {
+                await supabase.from('historial_alumnos').insert({
+                    alumno_id: alumnoId,
+                    ano_academico_id: currentAnoId,
+                    ...historialData
+                });
+            }
             alert('Alumno guardado');
             cargarAlumnos();
         };
