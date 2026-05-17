@@ -1004,16 +1004,22 @@
             } else {
                 // Si el libro es donado y hay donante, actualizar el historial del alumno
                 if (origen === 'Donado' && donanteId) {
-                    // Verificar si el alumno ya tiene historial este año
+                    // Obtener el año activo directamente desde la BD
+                    const { data: anoActivo } = await supabaseDebug
+                        .from('ano_academico')
+                        .select('id')
+                        .eq('activo', true)
+                        .single();
+                    const añoId = anoActivo.id;
+                    
                     const { data: historial } = await supabaseDebug
                         .from('historial_alumnos')
                         .select('donante, libros_donados')
                         .eq('alumno_id', donanteId)
-                        .eq('ano_academico_id', currentAnoId)
+                        .eq('ano_academico_id', añoId)
                         .maybeSingle();
                     
                     if (historial) {
-                        // Actualizar donante
                         await supabaseDebug
                             .from('historial_alumnos')
                             .update({ 
@@ -1022,19 +1028,19 @@
                                 fecha_donacion: new Date().toISOString().slice(0,10)
                             })
                             .eq('alumno_id', donanteId)
-                            .eq('ano_academico_id', currentAnoId);
+                            .eq('ano_academico_id', añoId);
                     } else {
-                        // Crear historial si no existe
                         await supabaseDebug
                             .from('historial_alumnos')
                             .insert({
                                 alumno_id: donanteId,
-                                ano_academico_id: currentAnoId,
+                                ano_academico_id: añoId,
                                 donante: true,
                                 libros_donados: 1,
                                 fecha_donacion: new Date().toISOString().slice(0,10),
                                 activo: true
                             });
+
                     }
                 }
                 
