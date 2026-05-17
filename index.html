@@ -774,7 +774,7 @@
             .maybeSingle();
         
         if (libroExistente) {
-            alert(`⚠️ El libro "${libroExistente.titulo}" ya está registrado`);
+            alert(`⚠️ El libro con código ${codigo} ya está registrado`);
             return;
         }
         
@@ -791,8 +791,6 @@
                 <h2>📖 Nuevo Libro</h2>
                 <p>Código escaneado: <strong>${codigo}</strong></p>
                 <div class="form-grid">
-                    <div><label>Título *</label><input id="nuevoTitulo" placeholder="Título del libro"></div>
-                    
                     <div><label>Materia *</label>
                         <select id="nuevoMateria">
                             <option value="">Selecciona o escribe...</option>
@@ -809,7 +807,7 @@
                         <input type="text" id="nuevaEditorialInput" placeholder="O escribe una nueva editorial" style="margin-top:5px;">
                     </div>
                     
-                    <div><label>Curso</label><select id="nuevoCurso">
+                    <div><label>Curso *</label><select id="nuevoCurso">
                         <option value="">Selecciona</option>
                         <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                         <option>1BAC</option><option>2BAC</option>
@@ -823,19 +821,30 @@
                         <option>IES</option><option>AMPA</option><option>Donado</option>
                     </select></div>
                     
+                    <div id="donanteDiv" style="display:none;">
+                        <label>Alumno donante</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="buscarDonante" placeholder="Nombre, apellidos o código" style="flex:1;">
+                            <button id="btnBuscarDonante">🔍 Buscar</button>
+                        </div>
+                        <div id="resultadoDonante" style="margin-top:8px;"></div>
+                        <input type="hidden" id="donanteId">
+                    </div>
+                    
                     <div><label>Año compra</label><select id="nuevoAnio">
                         <option value="">Selecciona</option>
                         ${años.map(a => `<option value="${a}">${a}</option>`).join('')}
                     </select></div>
                     
-                    <div><label>Signatura (XX - XX - XXX)</label>
-                        <div style="display: flex; gap: 8px;">
+                    <div><label>Signatura</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
                             <input type="text" id="sig1" placeholder="XX" maxlength="2" style="width:70px;">
                             <span>-</span>
                             <input type="text" id="sig2" placeholder="XX" maxlength="2" style="width:70px;">
                             <span>-</span>
                             <input type="text" id="sig3" placeholder="XXX" maxlength="3" style="width:90px;">
                         </div>
+                        <small style="color:#64748b;">📌 Formato: Código de materia - Código de curso - Nº ejemplar</small>
                     </div>
                 </div>
                 <div class="flex"><button id="guardarNuevoLibroBtn">💾 Guardar libro</button>
@@ -845,7 +854,67 @@
         
         document.getElementById('mainPanel').innerHTML = html;
         
-        // Añadir opciones nuevas a materias
+        // Mostrar/ocultar buscador de donante según origen
+        document.getElementById('nuevoOrigen').addEventListener('change', function() {
+            const donanteDiv = document.getElementById('donanteDiv');
+            if (this.value === 'Donado') {
+                donanteDiv.style.display = 'block';
+            } else {
+                donanteDiv.style.display = 'none';
+                document.getElementById('donanteId').value = '';
+                document.getElementById('resultadoDonante').innerHTML = '';
+            }
+        });
+        
+        // Buscar donante
+        document.getElementById('btnBuscarDonante').onclick = async () => {
+            const searchTerm = document.getElementById('buscarDonante').value.trim();
+            const resultadoDiv = document.getElementById('resultadoDonante');
+            
+            if (!searchTerm) {
+                resultadoDiv.innerHTML = '<p>Escribe un nombre o código</p>';
+                return;
+            }
+            
+            resultadoDiv.innerHTML = '<p>Buscando...</p>';
+            
+            let query = supabaseDebug.from('alumnos').select('id, nombre, apellidos, codigo_usuario');
+            
+            if (!isNaN(searchTerm)) {
+                query = query.eq('codigo_usuario', parseInt(searchTerm));
+            } else {
+                query = query.or(`nombre.ilike.%${searchTerm}%,apellidos.ilike.%${searchTerm}%`);
+            }
+            
+            const { data: alumnos } = await query.limit(5);
+            
+            if (!alumnos || alumnos.length === 0) {
+                resultadoDiv.innerHTML = '<p>No se encontraron alumnos</p>';
+                return;
+            }
+            
+            let htmlResult = '<div style="max-height:150px; overflow-y:auto;">';
+            for (const a of alumnos) {
+                htmlResult += `
+                    <div class="alumno-row" style="cursor:pointer; margin-bottom:5px;" onclick="seleccionarDonante(${a.id}, '${a.nombre} ${a.apellidos || ''} (${a.codigo_usuario || 'Sin código'})')">
+                        <div class="alumno-info">
+                            <strong>${a.nombre} ${a.apellidos || ''}</strong><br>
+                            Código: ${a.codigo_usuario || 'Sin código'}
+                        </div>
+                    </div>
+                `;
+            }
+            htmlResult += '</div>';
+            resultadoDiv.innerHTML = htmlResult;
+        };
+        
+        // Función global para seleccionar donante
+        window.seleccionarDonante = (id, texto) => {
+            document.getElementById('donanteId').value = id;
+            document.getElementById('resultadoDonante').innerHTML = `<p>✅ Donante seleccionado: ${texto}</p>`;
+        };
+        
+        // Añadir nuevas opciones
         document.getElementById('nuevaMateriaInput').addEventListener('change', function() {
             if(this.value) {
                 const select = document.getElementById('nuevoMateria');
@@ -857,7 +926,6 @@
             }
         });
         
-        // Añadir opciones nuevas a editoriales
         document.getElementById('nuevaEditorialInput').addEventListener('change', function() {
             if(this.value) {
                 const select = document.getElementById('nuevoEditorial');
@@ -870,7 +938,6 @@
         });
         
         document.getElementById('guardarNuevoLibroBtn').onclick = async () => {
-            const titulo = document.getElementById('nuevoTitulo').value.trim();
             const materia = document.getElementById('nuevoMateria').value || document.getElementById('nuevaMateriaInput').value;
             const editorial = document.getElementById('nuevoEditorial').value || document.getElementById('nuevaEditorialInput').value;
             const curso = document.getElementById('nuevoCurso').value;
@@ -880,25 +947,32 @@
             const sig1 = document.getElementById('sig1').value;
             const sig2 = document.getElementById('sig2').value;
             const sig3 = document.getElementById('sig3').value;
+            const donanteId = document.getElementById('donanteId').value;
             
-            if (!titulo || !materia || !curso) {
-                alert('Título, materia y curso son obligatorios');
+            if (!materia || !curso) {
+                alert('Materia y curso son obligatorios');
                 return;
             }
             
-            const signatura = `${sig1}-${sig2}-${sig3}`;
+            const signatura = sig1 && sig2 && sig3 ? `${sig1}-${sig2}-${sig3}` : null;
             
-            const { error } = await supabaseDebug.from('libros').insert({
+            // Generar título automático: Materia + Curso
+            const titulo = `${materia} ${curso}`;
+            
+            const libroData = {
                 codigo_barras: codigo,
                 titulo: titulo,
                 materia: materia,
-                editorial: editorial,
+                editorial: editorial || null,
                 curso_para: curso,
                 estado: estado,
                 origen: origen,
                 fecha_compra: anio ? `${anio}-01-01` : null,
-                signatura: signatura || null
-            });
+                signatura: signatura,
+                donante_id: origen === 'Donado' && donanteId ? parseInt(donanteId) : null
+            };
+            
+            const { error } = await supabaseDebug.from('libros').insert(libroData);
             
             if (error) {
                 alert('Error: ' + error.message);
