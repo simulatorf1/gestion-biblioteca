@@ -429,24 +429,203 @@
         };
         
         if(document.getElementById('imprimirAlumnoBtn')) {
-            document.getElementById('imprimirAlumnoBtn').onclick = () => {
+            document.getElementById('imprimirAlumnoBtn').onclick = async () => {
+                // Obtener libros prestados actualmente (no devueltos)
+                const { data: prestamosActivos } = await supabase
+                    .from('prestamos')
+                    .select('*, libros(*)')
+                    .eq('alumno_id', alumnoId)
+                    .eq('entregado', false);
+                
+                // Obtener historial de préstamos (devueltos)
+                const { data: prestamosHistoricos } = await supabase
+                    .from('prestamos')
+                    .select('*, libros(*)')
+                    .eq('alumno_id', alumnoId)
+                    .eq('entregado', true);
+                
                 const ventana = window.open('', '_blank');
                 ventana.document.write(`
+                    <!DOCTYPE html>
                     <html>
-                    <head><title>Ficha de ${alumno?.nombre}</title></head>
-                    <body style="font-family:sans-serif; padding:20px;">
-                        <h1>Ficha de Alumno</h1>
-                        <p><strong>Código:</strong> ${alumno?.codigo_usuario}</p>
-                        <p><strong>Nombre:</strong> ${alumno?.nombre} ${alumno?.apellidos || ''}</p>
-                        <p><strong>Curso:</strong> ${historialActual?.curso} ${historialActual?.grupo || ''}</p>
-                        <p><strong>Teléfono:</strong> ${historialActual?.telefono || '-'}</p>
-                        <p><strong>Bilingüe:</strong> ${historialActual?.bilingue ? 'Sí' : 'No'}</p>
-                        <p><strong>Beca:</strong> ${historialActual?.beca ? 'Sí' : 'No'}</p>
-                        <p><strong>Socio AMPA:</strong> ${historialActual?.socio_ampa ? 'Sí' : 'No'}</p>
-                        <p><strong>Donante:</strong> ${historialActual?.donante ? 'Sí' : 'No'}</p>
-                        <p><strong>Observaciones:</strong> ${historialActual?.observaciones || '-'}</p>
-                        <hr>
-                        <p>Fecha impresión: ${new Date().toLocaleString()}</p>
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Ficha de ${alumno?.nombre} ${alumno?.apellidos || ''}</title>
+                        <style>
+                            * { margin: 0; padding: 0; box-sizing: border-box; }
+                            body {
+                                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                                padding: 40px;
+                                background: white;
+                                color: #1e293b;
+                            }
+                            .header {
+                                text-align: center;
+                                margin-bottom: 30px;
+                                padding-bottom: 20px;
+                                border-bottom: 3px solid #2563eb;
+                            }
+                            .header h1 {
+                                color: #1e40af;
+                                font-size: 24px;
+                                margin-bottom: 5px;
+                            }
+                            .header p {
+                                color: #64748b;
+                                font-size: 14px;
+                            }
+                            .titulo-ficha {
+                                background: #f8fafc;
+                                padding: 12px;
+                                border-radius: 8px;
+                                margin: 20px 0;
+                                text-align: center;
+                                border-left: 4px solid #2563eb;
+                            }
+                            .datos {
+                                display: grid;
+                                grid-template-columns: repeat(3, 1fr);
+                                gap: 12px;
+                                margin-bottom: 30px;
+                                background: #f1f5f9;
+                                padding: 20px;
+                                border-radius: 12px;
+                            }
+                            .dato {
+                                font-size: 14px;
+                            }
+                            .dato strong {
+                                color: #1e40af;
+                            }
+                            table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                margin: 15px 0;
+                            }
+                            th, td {
+                                border: 1px solid #cbd5e1;
+                                padding: 10px;
+                                text-align: left;
+                                font-size: 13px;
+                            }
+                            th {
+                                background: #2563eb;
+                                color: white;
+                            }
+                            .compromiso {
+                                margin-top: 40px;
+                                padding: 20px;
+                                background: #fef3c7;
+                                border-radius: 8px;
+                                font-size: 12px;
+                                text-align: center;
+                            }
+                            .firma {
+                                margin-top: 40px;
+                                display: flex;
+                                justify-content: space-between;
+                                padding-top: 40px;
+                            }
+                            .firma-linea {
+                                text-align: center;
+                                width: 45%;
+                            }
+                            .firma-linea hr {
+                                margin-top: 10px;
+                                width: 100%;
+                            }
+                            .footer {
+                                margin-top: 40px;
+                                text-align: center;
+                                font-size: 10px;
+                                color: #94a3b8;
+                                border-top: 1px solid #e2e8f0;
+                                padding-top: 20px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>📚 INSTITUTO VICTOR GARCÍA DE LA CONCHA</h1>
+                            <p>Villaviciosa - Banco de Libros</p>
+                            <p>Año Académico: ${historialActual?.ano_academico_id === currentAnoId ? 'Actual' : 'Anterior'}</p>
+                        </div>
+                        
+                        <div class="titulo-ficha">
+                            <h2>📄 FICHA DEL ALUMNO</h2>
+                        </div>
+                        
+                        <div class="datos">
+                            <div class="dato"><strong>Código:</strong> ${alumno?.codigo_usuario || 'Sin código'}</div>
+                            <div class="dato"><strong>Nombre:</strong> ${alumno?.nombre} ${alumno?.apellidos || ''}</div>
+                            <div class="dato"><strong>Curso:</strong> ${historialActual?.curso || '-'} ${historialActual?.grupo || ''}</div>
+                            <div class="dato"><strong>Teléfono:</strong> ${historialActual?.telefono || '-'}</div>
+                            <div class="dato"><strong>Bilingüe:</strong> ${historialActual?.bilingue ? 'Sí' : 'No'}</div>
+                            <div class="dato"><strong>Beca:</strong> ${historialActual?.beca ? 'Sí' : 'No'}</div>
+                            <div class="dato"><strong>Socio AMPA:</strong> ${historialActual?.socio_ampa ? 'Sí' : 'No'}</div>
+                            <div class="dato"><strong>Donante:</strong> ${historialActual?.donante ? 'Sí' : 'No'}</div>
+                        </div>
+                        
+                        <h3>📚 LIBROS PRESTADOS (${prestamosActivos?.length || 0})</h3>
+                        <table>
+                            <thead>
+                                <tr><th>Título</th><th>Materia</th><th>Curso</th><th>Editorial</th><th>Signatura</th><th>Fecha préstamo</th></tr>
+                            </thead>
+                            <tbody>
+                                ${prestamosActivos?.map(p => `
+                                    <tr>
+                                        <td>${p.libros?.titulo || '-'}</td>
+                                        <td>${p.libros?.materia || '-'}</td>
+                                        <td>${p.libros?.curso_para || '-'}</td>
+                                        <td>${p.libros?.editorial || '-'}</td>
+                                        <td>${p.libros?.signatura || '-'}</td>
+                                        <td>${p.fecha_prestamo || '-'}</td>
+                                    </tr>
+                                `).join('') || '<tr><td colspan="6">No tiene libros prestados actualmente</td></tr>'}
+                            </tbody>
+                        </table>
+                        
+                        <h3>📜 HISTÓRICO DE PRÉSTAMOS DEVUELTOS (${prestamosHistoricos?.length || 0})</h3>
+                        <table>
+                            <thead>
+                                <tr><th>Título</th><th>Materia</th><th>Curso</th><th>Fecha préstamo</th><th>Fecha devolución</th></tr>
+                            </thead>
+                            <tbody>
+                                ${prestamosHistoricos?.map(p => `
+                                    <tr>
+                                        <td>${p.libros?.titulo || '-'}</td>
+                                        <td>${p.libros?.materia || '-'}</td>
+                                        <td>${p.libros?.curso_para || '-'}</td>
+                                        <td>${p.fecha_prestamo || '-'}</td>
+                                        <td>${p.fecha_devolucion || '-'}</td>
+                                    </tr>
+                                `).join('') || '<tr><td colspan="5">No hay historial de devoluciones</td></tr>'}
+                            </tbody>
+                        </table>
+                        
+                        <div class="compromiso">
+                            <p><strong>📌 COMPROMISO DEL ALUMNO/A</strong></p>
+                            <p>El/la abajo firmante se compromete a hacer buen uso de los libros recibidos,<br>
+                            a devolverlos en el mismo estado en que los recibe al finalizar el curso académico,<br>
+                            y a comunicar cualquier pérdida o deterioro al departamento correspondiente.</p>
+                            <p>En ${new Date().toLocaleDateString()}</p>
+                        </div>
+                        
+                        <div class="firma">
+                            <div class="firma-linea">
+                                <p>Firma del alumno/a</p>
+                                <hr>
+                            </div>
+                            <div class="firma-linea">
+                                <p>Firma del padre/madre/tutor</p>
+                                <hr>
+                            </div>
+                        </div>
+                        
+                        <div class="footer">
+                            <p>Instituto Victor García de la Concha - Villaviciosa | Banco de Libros</p>
+                            <p>Documento generado automáticamente - Fecha: ${new Date().toLocaleString()}</p>
+                        </div>
                     </body>
                     </html>
                 `);
