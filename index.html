@@ -468,13 +468,10 @@
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
                         <div><label>Código de usuario</label><input type="text" id="socioCodigo" placeholder="Ej: 202670001"></div>
-                        <div><label>Estado socio</label><select id="socioEstado">
+                        <div><label>Filtrar socios</label><select id="socioEstado">
                             <option value="">Todos</option>
                             <option value="socio">✅ Solo socios</option>
-                            <option value="no_socio">❌ Solo no socios</option>
-                            <option value="pagado">💰 Socios con pago realizado</option>
-                            <option value="pendiente">⚠️ Socios con pago pendiente</option>
-                        </select></div>                        
+                        </select></div>                      
                     </div>
                     <button id="btnBuscarSocio" style="margin-top:10px;">Buscar</button>
                     <button id="btnLimpiarSocio" class="secondary" style="margin-top:10px;">Limpiar</button>
@@ -501,6 +498,7 @@
             if(el) el.addEventListener('keypress', (e) => { if(e.key === 'Enter') buscarSociosMejorado(); });
         });
     }
+
 
     async function buscarSociosMejorado() {
         const nombreRaw = document.getElementById('socioNombre').value.trim();
@@ -571,15 +569,9 @@
             alumno.fecha_pago = socio?.fecha_pago || null;
         }
         
-        // Filtrar por estado socio
+        // Filtrar por estado socio (solo si está seleccionado "socio")
         if (estadoFiltro === 'socio') {
             resultados = resultados.filter(a => a.esSocio === true);
-        } else if (estadoFiltro === 'no_socio') {
-            resultados = resultados.filter(a => a.esSocio === false);
-        } else if (estadoFiltro === 'pagado') {
-            resultados = resultados.filter(a => a.haPagado === true);
-        } else if (estadoFiltro === 'pendiente') {
-            resultados = resultados.filter(a => a.esSocio === true && a.haPagado === false);
         }
         
         if (resultados.length === 0) {
@@ -595,12 +587,11 @@
                     <div class="alumno-info">
                         <strong>${alumno.nombre} ${alumno.apellidos || ''}</strong><br>
                         📋 Código: ${alumno.codigo_usuario || 'Sin código'} | Curso: ${alumno.curso} ${alumno.grupo || ''}<br>
-                        ${alumno.esSocio ? (alumno.haPagado ? '✅ Socio - Pago registrado' : '⚠️ Socio - Pago pendiente') : '❌ No es socio'}
-                        ${alumno.n_socio ? `<br>📅 Nº Socio: ${alumno.n_socio} | Fecha pago: ${alumno.fecha_pago || 'No registrada'}` : ''}
+                        ${alumno.esSocio ? '✅ Socio AMPA' : '❌ No es socio'}
+                        ${alumno.n_socio ? `<br>📅 Nº Socio: ${alumno.n_socio}` : ''}
                     </div>
                     <div class="alumno-actions">
                         ${!alumno.esSocio ? `<button onclick="window.registrarPagoSocioDirecto(${alumno.id})">➕ Hacer socio</button>` : ''}
-                        ${alumno.esSocio ? `<button onclick="window.editarPagoSocio(${alumno.id})">✏️ Editar pago</button>` : ''}
                         ${alumno.esSocio ? `<button class="danger" onclick="window.darBajaSocio(${alumno.id})">🗑️ Dar baja socio</button>` : ''}
                     </div>
                 </div>
