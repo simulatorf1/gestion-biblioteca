@@ -569,7 +569,7 @@
                         <h3>📚 LIBROS PRESTADOS (${prestamosActivos?.length || 0})</h3>
                         <table>
                             <thead>
-                                <tr><th>Título</th><th>Materia</th><th>Curso</th><th>Editorial</th><th>Signatura</th><th>Fecha préstamo</th></tr>
+                                <tr><th>Título</th><th>Materia</th><th>Curso</th><th>Editorial</th><th>Signatura</th><th>Estado</th><th>Fecha préstamo</th></tr>
                             </thead>
                             <tbody>
                                 ${prestamosActivos?.map(p => `
@@ -579,9 +579,10 @@
                                         <td>${p.libros?.curso_para || '-'}</td>
                                         <td>${p.libros?.editorial || '-'}</td>
                                         <td>${p.libros?.signatura || '-'}</td>
+                                        <td style="color:${p.libros?.estado === 'desgastado' ? '#dc2626' : (p.libros?.estado === 'usado' ? '#f59e0b' : '#10b981')}">${p.libros?.estado || 'nuevo'}</td>
                                         <td>${p.fecha_prestamo || '-'}</td>
                                     </tr>
-                                `).join('') || '<tr><td colspan="6">No tiene libros prestados actualmente</td></tr>'}
+                                `).join('') || '<tr><td colspan="7">No tiene libros prestados actualmente</td></tr>'}
                             </tbody>
                         </table>
                         
