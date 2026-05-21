@@ -5696,8 +5696,12 @@
     window.supabase = supabase;
     window.buscarAlumnosMejorado = buscarAlumnosMejorado;
     window.normalizarTexto = normalizarTexto;
-    // Iniciar verificación de login
-    verificarLogin();    
+    // Iniciar verificación de login cuando el DOM esté listo
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', verificarLogin);
+    } else {
+        verificarLogin();
+    }
 })();
 </script>
 </body>
