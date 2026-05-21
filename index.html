@@ -270,7 +270,11 @@
         } else {
             errorDiv.textContent = '❌ Usuario o contraseña incorrectos';
         }
-    }    
+    }
+    
+    // ========== EXPORTAR FUNCIONES AL GLOBAL ==========
+    window.hacerLogin = hacerLogin;
+    window.verificarLogin = verificarLogin;  
     // ==================== INICIALIZACIÓN ====================
     async function init() {
         // Verificar login antes de cargar nada
@@ -5682,33 +5686,60 @@
     
 })();
 
-// ========== CÓDIGO DE LOGIN FUERA DE LA FUNCIÓN (después del cierre) ==========
-// Ahora las funciones son accesibles desde window
-document.getElementById('btnLogin')?.addEventListener('click', () => {
-    const hacerLoginFn = window.hacerLogin;
-    if (hacerLoginFn) hacerLoginFn();
-});
 
-document.getElementById('loginPass')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        const hacerLoginFn = window.hacerLogin;
-        if (hacerLoginFn) hacerLoginFn();
+
+// Configurar login después de que todo cargue
+setTimeout(function() {
+    const btnLogin = document.getElementById('btnLogin');
+    const loginPass = document.getElementById('loginPass');
+    const loginUser = document.getElementById('loginUser');
+    const overlay = document.getElementById('loginOverlay');
+    
+    // Verificar si ya está logueado
+    if (sessionStorage.getItem('loggedIn') === 'true') {
+        if (overlay) overlay.style.display = 'none';
+    } else {
+        if (overlay) overlay.style.display = 'flex';
     }
-});
-
-document.getElementById('loginUser')?.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        const hacerLoginFn = window.hacerLogin;
-        if (hacerLoginFn) hacerLoginFn();
+    
+    // Función de login usando supabase que ya existe
+    async function hacerLoginExterno() {
+        const username = document.getElementById('loginUser').value.trim();
+        const password = document.getElementById('loginPass').value;
+        const errorDiv = document.getElementById('loginError');
+        
+        if (!username || !password) {
+            errorDiv.textContent = '❌ Usuario y contraseña obligatorios';
+            return;
+        }
+        
+        errorDiv.textContent = 'Verificando...';
+        
+        const { data: usuarios, error } = await supabase
+            .from('usuarios_app')
+            .select('username, password')
+            .eq('username', username)
+            .eq('password', password);
+        
+        if (error) {
+            errorDiv.textContent = '❌ Error de conexión';
+            return;
+        }
+        
+        if (usuarios && usuarios.length > 0) {
+            sessionStorage.setItem('loggedIn', 'true');
+            overlay.style.display = 'none';
+            location.reload();
+        } else {
+            errorDiv.textContent = '❌ Usuario o contraseña incorrectos';
+        }
     }
-});
-
-// Exponer funciones al window para que sean accesibles
-window.hacerLogin = hacerLogin;
-window.verificarLogin = verificarLogin;
-
-// Iniciar verificación
-window.verificarLogin();
+    
+    if (btnLogin) btnLogin.onclick = hacerLoginExterno;
+    if (loginPass) loginPass.onkeypress = (e) => { if (e.key === 'Enter') hacerLoginExterno(); };
+    if (loginUser) loginUser.onkeypress = (e) => { if (e.key === 'Enter') hacerLoginExterno(); };
+    
+}, 100);
 </script>
 </body>
 </html>
