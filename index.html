@@ -5679,19 +5679,28 @@
     window.supabaseDebug = supabase;
     window.buscarAlumnosMejorado = buscarAlumnosMejorado;
     window.normalizarTexto = normalizarTexto;
+    
     // Configurar evento del botón login
-    document.getElementById('btnLogin')?.addEventListener('click', hacerLogin);
-    document.getElementById('loginPass')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') hacerLogin();
-    });
-    document.getElementById('loginUser')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') hacerLogin();
-    });
+    const btnLogin = document.getElementById('btnLogin');
+    if (btnLogin) {
+        btnLogin.addEventListener('click', hacerLogin);
+    }
+    const loginPass = document.getElementById('loginPass');
+    if (loginPass) {
+        loginPass.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') hacerLogin();
+        });
+    }
+    const loginUser = document.getElementById('loginUser');
+    if (loginUser) {
+        loginUser.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') hacerLogin();
+        });
+    }
     
     // Verificar login al cargar
     verificarLogin();
     
-    // No llamar a init() directamente
 })();
 </script>
 </body>
