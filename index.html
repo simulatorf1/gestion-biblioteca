@@ -52,10 +52,76 @@
         
         .btn-prestamo-inactivo {
             background: #2563eb;
-        }        
+        }
+        /* Pantalla de login */
+        #loginOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            z-index: 20000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 24px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .login-card h1 {
+            margin-bottom: 10px;
+            color: #1e40af;
+        }
+        .login-card input {
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+        }
+        .login-card button {
+            width: 100%;
+            padding: 14px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        .login-card button:hover {
+            background: #1e40af;
+        }
+        .error-msg {
+            color: #dc2626;
+            font-size: 0.85rem;
+            margin-top: 10px;
+        }
+        
     </style>
 </head>
 <body>
+<!-- Pantalla de LOGIN -->
+<div id="loginOverlay">
+    <div class="login-card">
+        <h1>📚 Banco de Libros</h1>
+        <p style="color:#64748b; margin-bottom:20px;">Acceso restringido</p>
+        <input type="text" id="loginUser" placeholder="Usuario" autocomplete="off">
+        <input type="password" id="loginPass" placeholder="Contraseña">
+        <button id="btnLogin">Entrar</button>
+        <div id="loginError" class="error-msg"></div>
+    </div>
+</div>    
 <div class="container">
 
 
@@ -161,9 +227,59 @@
     let currentEditingAlumnoId = null;
     let modoActual = "";
     let scannerActivo = false;
+    // ==================== LOGIN ====================
+    let usuarioLogueado = false;
     
+    async function verificarLogin() {
+        if (sessionStorage.getItem('loggedIn') === 'true') {
+            document.getElementById('loginOverlay').style.display = 'none';
+            await init();
+            return;
+        }
+        document.getElementById('loginOverlay').style.display = 'flex';
+    }
+    
+    async function hacerLogin() {
+        const username = document.getElementById('loginUser').value.trim();
+        const password = document.getElementById('loginPass').value;
+        const errorDiv = document.getElementById('loginError');
+        
+        if (!username || !password) {
+            errorDiv.textContent = '❌ Usuario y contraseña obligatorios';
+            return;
+        }
+        
+        errorDiv.textContent = 'Verificando...';
+        
+        const { data: usuarios, error } = await supabase
+            .from('usuarios_app')
+            .select('username, password')
+            .eq('username', username)
+            .eq('password', password);
+        
+        if (error) {
+            errorDiv.textContent = '❌ Error de conexión';
+            console.error(error);
+            return;
+        }
+        
+        if (usuarios && usuarios.length > 0) {
+            sessionStorage.setItem('loggedIn', 'true');
+            document.getElementById('loginOverlay').style.display = 'none';
+            await init();
+        } else {
+            errorDiv.textContent = '❌ Usuario o contraseña incorrectos';
+        }
+    }    
     // ==================== INICIALIZACIÓN ====================
     async function init() {
+        // Verificar login antes de cargar nada
+        if (sessionStorage.getItem('loggedIn') !== 'true') {
+            verificarLogin();
+            return;
+        }
+        
+
         await cargarAnosAcademicos();
         setupEventListeners();
         // Botones de backup y restauración
@@ -5563,7 +5679,19 @@
     window.supabaseDebug = supabase;
     window.buscarAlumnosMejorado = buscarAlumnosMejorado;
     window.normalizarTexto = normalizarTexto;
-    init();
+    // Configurar evento del botón login
+    document.getElementById('btnLogin')?.addEventListener('click', hacerLogin);
+    document.getElementById('loginPass')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') hacerLogin();
+    });
+    document.getElementById('loginUser')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') hacerLogin();
+    });
+    
+    // Verificar login al cargar
+    verificarLogin();
+    
+    // No llamar a init() directamente
 })();
 </script>
 </body>
