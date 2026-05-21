@@ -5680,28 +5680,35 @@
     window.buscarAlumnosMejorado = buscarAlumnosMejorado;
     window.normalizarTexto = normalizarTexto;
     
-    // Configurar evento del botón login
-    const btnLogin = document.getElementById('btnLogin');
-    if (btnLogin) {
-        btnLogin.addEventListener('click', hacerLogin);
-    }
-    const loginPass = document.getElementById('loginPass');
-    if (loginPass) {
-        loginPass.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') hacerLogin();
-        });
-    }
-    const loginUser = document.getElementById('loginUser');
-    if (loginUser) {
-        loginUser.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') hacerLogin();
-        });
-    }
-    
-    // Verificar login al cargar
-    verificarLogin();
-    
 })();
+
+// ========== CÓDIGO DE LOGIN FUERA DE LA FUNCIÓN (después del cierre) ==========
+// Ahora las funciones son accesibles desde window
+document.getElementById('btnLogin')?.addEventListener('click', () => {
+    const hacerLoginFn = window.hacerLogin;
+    if (hacerLoginFn) hacerLoginFn();
+});
+
+document.getElementById('loginPass')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        const hacerLoginFn = window.hacerLogin;
+        if (hacerLoginFn) hacerLoginFn();
+    }
+});
+
+document.getElementById('loginUser')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        const hacerLoginFn = window.hacerLogin;
+        if (hacerLoginFn) hacerLoginFn();
+    }
+});
+
+// Exponer funciones al window para que sean accesibles
+window.hacerLogin = hacerLogin;
+window.verificarLogin = verificarLogin;
+
+// Iniciar verificación
+window.verificarLogin();
 </script>
 </body>
 </html>
