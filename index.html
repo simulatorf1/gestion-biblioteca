@@ -237,8 +237,11 @@
             return;
         }
         document.getElementById('loginOverlay').style.display = 'flex';
+        // Ocultar contenido principal
+        document.querySelector('.container')?.style.setProperty('display', 'none');
+        document.querySelector('.nav-tabs')?.style.setProperty('display', 'none');
+        document.getElementById('mainPanel')?.style.setProperty('display', 'none');
     }
-    
     async function hacerLogin() {
         const username = document.getElementById('loginUser').value.trim();
         const password = document.getElementById('loginPass').value;
@@ -251,24 +254,29 @@
         
         errorDiv.textContent = 'Verificando...';
         
-        const { data: usuarios, error } = await supabase
-            .from('usuarios_app')
-            .select('username, password')
-            .eq('username', username)
-            .eq('password', password);
-        
-        if (error) {
+        try {
+            const { data: usuarios, error } = await supabase
+                .from('usuarios_app')
+                .select('username, password')
+                .eq('username', username)
+                .eq('password', password);
+            
+            if (error) throw error;
+            
+            if (usuarios && usuarios.length > 0) {
+                sessionStorage.setItem('loggedIn', 'true');
+                document.getElementById('loginOverlay').style.display = 'none';
+                // Mostrar contenido principal
+                document.querySelector('.container')?.style.setProperty('display', 'block');
+                document.querySelector('.nav-tabs')?.style.setProperty('display', 'flex');
+                document.getElementById('mainPanel')?.style.setProperty('display', 'block');
+                await init();
+            } else {
+                errorDiv.textContent = '❌ Usuario o contraseña incorrectos';
+            }
+        } catch (error) {
             errorDiv.textContent = '❌ Error de conexión';
             console.error(error);
-            return;
-        }
-        
-        if (usuarios && usuarios.length > 0) {
-            sessionStorage.setItem('loggedIn', 'true');
-            document.getElementById('loginOverlay').style.display = 'none';
-            await init();
-        } else {
-            errorDiv.textContent = '❌ Usuario o contraseña incorrectos';
         }
     }
     
@@ -279,14 +287,20 @@
     async function init() {
         // Verificar login antes de cargar nada
         if (sessionStorage.getItem('loggedIn') !== 'true') {
-            verificarLogin();
+            // No llamar a verificarLogin() aquí, solo ocultar el contenido principal
+            document.querySelector('.container')?.style.setProperty('display', 'none');
+            document.querySelector('.nav-tabs')?.style.setProperty('display', 'none');
+            document.getElementById('mainPanel')?.style.setProperty('display', 'none');
             return;
         }
         
+        // Mostrar el contenido principal
+        document.querySelector('.container')?.style.setProperty('display', 'block');
+        document.querySelector('.nav-tabs')?.style.setProperty('display', 'flex');
+        document.getElementById('mainPanel')?.style.setProperty('display', 'block');
 
         await cargarAnosAcademicos();
         setupEventListeners();
-        // Botones de backup y restauración
         const btnBackup = document.getElementById('btnBackupExcel');
         if (btnBackup) btnBackup.onclick = descargarBackupExcel;
         
@@ -302,14 +316,12 @@
         if (btnAdminToggle) {
             btnAdminToggle.onclick = (e) => {
                 e.stopPropagation();
-                // Alternar entre mostrar y ocultar
                 if (adminMenu.style.display === 'none' || adminMenu.style.display === '') {
                     adminMenu.style.display = 'block';
                 } else {
                     adminMenu.style.display = 'none';
                 }
             };
-            // Cerrar al hacer clic fuera
             document.addEventListener('click', function(e) {
                 if (!adminMenu.contains(e.target) && e.target !== btnAdminToggle) {
                     adminMenu.style.display = 'none';
@@ -5684,63 +5696,9 @@
     window.supabase = supabase;
     window.buscarAlumnosMejorado = buscarAlumnosMejorado;
     window.normalizarTexto = normalizarTexto;
-    
+    // Iniciar verificación de login
+    verificarLogin();    
 })();
-
-
-
-// Configurar login después de que todo cargue
-setTimeout(function() {
-    const btnLogin = document.getElementById('btnLogin');
-    const loginPass = document.getElementById('loginPass');
-    const loginUser = document.getElementById('loginUser');
-    const overlay = document.getElementById('loginOverlay');
-    
-    // Verificar si ya está logueado
-    if (sessionStorage.getItem('loggedIn') === 'true') {
-        if (overlay) overlay.style.display = 'none';
-    } else {
-        if (overlay) overlay.style.display = 'flex';
-    }
-    
-    // Función de login usando supabase que ya existe
-    async function hacerLoginExterno() {
-        const username = document.getElementById('loginUser').value.trim();
-        const password = document.getElementById('loginPass').value;
-        const errorDiv = document.getElementById('loginError');
-        
-        if (!username || !password) {
-            errorDiv.textContent = '❌ Usuario y contraseña obligatorios';
-            return;
-        }
-        
-        errorDiv.textContent = 'Verificando...';
-        
-        const { data: usuarios, error } = await supabase
-            .from('usuarios_app')
-            .select('username, password')
-            .eq('username', username)
-            .eq('password', password);
-        
-        if (error) {
-            errorDiv.textContent = '❌ Error de conexión';
-            return;
-        }
-        
-        if (usuarios && usuarios.length > 0) {
-            sessionStorage.setItem('loggedIn', 'true');
-            overlay.style.display = 'none';
-            location.reload();
-        } else {
-            errorDiv.textContent = '❌ Usuario o contraseña incorrectos';
-        }
-    }
-    
-    if (btnLogin) btnLogin.onclick = hacerLoginExterno;
-    if (loginPass) loginPass.onkeypress = (e) => { if (e.key === 'Enter') hacerLoginExterno(); };
-    if (loginUser) loginUser.onkeypress = (e) => { if (e.key === 'Enter') hacerLoginExterno(); };
-    
-}, 100);
 </script>
 </body>
 </html>
