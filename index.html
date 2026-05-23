@@ -692,6 +692,7 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
+                        <div><label>Grupo</label><input type="text" id="searchGrupo" placeholder="Ej: A, B, C"></div>
                         <div><label>Código de usuario</label><input type="text" id="searchCodigo" placeholder="Ej: 202670001"></div>
                     </div>
                     <button id="btnBuscar" style="margin-top:10px;">Buscar</button>
@@ -1141,6 +1142,7 @@
         let query = supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
+            .eq('activo', true)
             .eq('ano_academico_id', anoId);
         
         if (cursoFiltro) query = query.eq('curso', cursoFiltro);
@@ -1540,6 +1542,7 @@
         let query = supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
+            .eq('activo', true)
             .eq('ano_academico_id', anoId);   // ← USAR anoId, NO año activo
         
         const { data: historiales, error } = await query;
@@ -1635,7 +1638,10 @@
         if (cursoFiltro) {
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
-        
+        const grupoFiltro = document.getElementById('searchGrupo')?.value.trim();
+        if (grupoFiltro) {
+            resultados = resultados.filter(a => a.grupo === grupoFiltro);
+        }        
         if (resultados.length === 0) {
             resultadosDiv.innerHTML = `
                 <p>No se encontraron alumnos</p>
@@ -2102,6 +2108,7 @@
                             <option>1ESO</option><option>2ESO</option><option>3ESO</option><option>4ESO</option>
                             <option>1BAC</option><option>2BAC</option>
                         </select></div>
+                        <div><label>Grupo</label><input type="text" id="socioGrupo" placeholder="Ej: A, B, C"></div>
                         <div><label>Código de usuario</label><input type="text" id="socioCodigo" placeholder="Ej: 202670001"></div>
                         <div><label>Filtrar socios</label><select id="socioEstado">
                             <option value="">Todos</option>
@@ -2159,6 +2166,7 @@
         const { data: historiales, error } = await supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
+            .eq('activo', true)
             .eq('ano_academico_id', anoId);
         
         if (error) {
@@ -2193,6 +2201,10 @@
         if (cursoFiltro) {
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
+        const grupoFiltro = document.getElementById('socioGrupo')?.value.trim();
+        if (grupoFiltro) {
+            resultados = resultados.filter(a => a.grupo === grupoFiltro);
+        }        
         
         // OPTIMIZACIÓN: Una sola consulta para todos los socios
         const idsAlumnos = resultados.map(a => a.id);
@@ -3231,6 +3243,7 @@
         let query = supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
+            .eq('activo', true)
             .eq('ano_academico_id', anoId);
         
         if (cursoFiltro) query = query.eq('curso', cursoFiltro);
@@ -3794,7 +3807,10 @@
         if (cursoFiltro) {
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
-        
+        const grupoFiltro = document.getElementById('searchGrupo')?.value.trim();
+        if (grupoFiltro) {
+            resultados = resultados.filter(a => a.grupo === grupoFiltro);
+        }        
         if (resultados.length === 0) {
             resultadosDiv.innerHTML = '<p>✅ No hay alumnos con libros prestados actualmente</p>';
             return;
