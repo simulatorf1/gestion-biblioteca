@@ -823,6 +823,9 @@
                     <button id="btnEntregarBuscarClase" class="secondary">🔍 Buscar por clase</button>
                 </div>
                 <div id="entregarResultados" class="resultados" style="margin-top:10px;"></div>
+                <div style="margin-top:15px; text-align:center;">
+                    <button id="btnImprimirTodasFichas" class="secondary" style="display:none;">🖨️ Imprimir todas las fichas</button>
+                </div>                
             </div>
         `;
         document.getElementById('subpanelPrestamos').innerHTML = html;
@@ -833,11 +836,16 @@
             document.getElementById('entregarApellidos').value = '';
             document.getElementById('entregarCurso').value = '';
             document.getElementById('entregarGrupo').value = '';
+            document.getElementById('btnImprimirTodasFichas').style.display = 'none';
+            window.ultimosResultadosEntrega = null;
             document.getElementById('entregarCodigo').value = '';
             document.getElementById('entregarResultados').innerHTML = '';
         };
         document.getElementById('btnEntregarBuscarClase').onclick = () => mostrarBuscarClaseEntrega();
-        
+        const btnImprimirTodas = document.getElementById('btnImprimirTodasFichas');
+        if (btnImprimirTodas) {
+            btnImprimirTodas.onclick = () => imprimirTodasFichasEntrega();
+        }        
         const inputs = ['entregarNombre', 'entregarApellidos', 'entregarCurso', 'entregarGrupo', 'entregarCodigo'];
         inputs.forEach(id => {
             const el = document.getElementById(id);
@@ -946,6 +954,9 @@
     }
     
     function mostrarTablaResultadosEntrega(resultados, resultadosDiv) {
+        // Guardar resultados globalmente para usarlos al imprimir
+        window.ultimosResultadosEntrega = resultados;
+        
         let html = `<h3>Resultados (${resultados.length})</h3>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:0.75rem;">
@@ -975,8 +986,221 @@
         }
         html += `</tbody></table></div>`;
         resultadosDiv.innerHTML = html;
+        
+        // Mostrar el botón de imprimir si hay resultados
+        const btnImprimir = document.getElementById('btnImprimirTodasFichas');
+        if (btnImprimir && resultados.length > 0) {
+            btnImprimir.style.display = 'inline-block';
+        } else if (btnImprimir) {
+            btnImprimir.style.display = 'none';
+        }
     }
-    
+     async function imprimirTodasFichasEntrega() {
+        if (!window.ultimosResultadosEntrega || window.ultimosResultadosEntrega.length === 0) {
+            alert("No hay alumnos para imprimir");
+            return;
+        }
+        
+        const alumnos = window.ultimosResultadosEntrega;
+        const ventana = window.open('', '_blank');
+        
+        if (!ventana) {
+            alert("Por favor, permite las ventanas emergentes para imprimir");
+            return;
+        }
+        
+        ventana.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Fichas de entrega de lotes</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body {
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                        padding: 40px;
+                        background: white;
+                        color: #1e293b;
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 30px;
+                        padding-bottom: 20px;
+                        border-bottom: 3px solid #2563eb;
+                    }
+                    .header h1 { color: #1e40af; font-size: 24px; margin-bottom: 5px; }
+                    .header p { color: #64748b; font-size: 14px; }
+                    .titulo-ficha {
+                        background: #f8fafc;
+                        padding: 12px;
+                        border-radius: 8px;
+                        margin: 20px 0;
+                        text-align: center;
+                        border-left: 4px solid #2563eb;
+                    }
+                    .datos {
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 12px;
+                        margin-bottom: 30px;
+                        background: #f1f5f9;
+                        padding: 20px;
+                        border-radius: 12px;
+                    }
+                    .dato { font-size: 14px; }
+                    .dato strong { color: #1e40af; }
+                    table {
+                        width: 100%;
+                        border-collapse: collapse;
+                        margin: 15px 0;
+                    }
+                    th, td {
+                        border: 1px solid #cbd5e1;
+                        padding: 10px;
+                        text-align: left;
+                        font-size: 13px;
+                    }
+                    th { background: #2563eb; color: white; }
+                    .compromiso {
+                        margin-top: 40px;
+                        padding: 20px;
+                        background: #fef3c7;
+                        border-radius: 8px;
+                        font-size: 12px;
+                        text-align: center;
+                    }
+                    .firma {
+                        margin-top: 40px;
+                        display: flex;
+                        justify-content: space-between;
+                        padding-top: 40px;
+                    }
+                    .firma-linea { text-align: center; width: 45%; }
+                    .firma-linea hr { margin-top: 10px; width: 100%; }
+                    .footer {
+                        margin-top: 40px;
+                        text-align: center;
+                        font-size: 10px;
+                        color: #94a3b8;
+                        border-top: 1px solid #e2e8f0;
+                        padding-top: 20px;
+                    }
+                    .page-break {
+                        page-break-after: always;
+                    }
+                    @media print {
+                        body { padding: 20px; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="no-print" style="text-align:center; padding:20px; background:#f0f2f5; margin-bottom:20px;">
+                    <button onclick="window.print()" style="background:#2563eb; color:white; padding:10px 20px; border:none; border-radius:8px; cursor:pointer;">🖨️ Imprimir / Guardar como PDF</button>
+                    <button onclick="window.close()" style="background:#64748b; color:white; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; margin-left:10px;">✖ Cerrar</button>
+                    <hr style="margin-top:15px;">
+                </div>
+        `);
+        
+        // Generar una hoja por cada alumno
+        for (let i = 0; i < alumnos.length; i++) {
+            const a = alumnos[i];
+            
+            // Obtener datos completos del alumno y sus préstamos
+            const { data: alumnoData } = await supabase
+                .from('alumnos')
+                .select('*')
+                .eq('id', a.id)
+                .single();
+            
+            const { data: historialData } = await supabase
+                .from('historial_alumnos')
+                .select('*')
+                .eq('alumno_id', a.id)
+                .eq('ano_academico_id', currentAnoId)
+                .single();
+            
+            const { data: prestamosActivos } = await supabase
+                .from('prestamos')
+                .select('*, libros(*)')
+                .eq('alumno_id', a.id)
+                .eq('entregado', false);
+            
+            // Escribir la ficha del alumno
+            ventana.document.write(`
+                <div style="${i < alumnos.length - 1 ? 'page-break-after: always;' : ''} margin-bottom: 40px;">
+                    <div class="header">
+                        <h1>📚 INSTITUTO VICTOR GARCÍA DE LA CONCHA</h1>
+                        <p>Villaviciosa - Banco de Libros</p>
+                        <p>Año Académico: ${new Date().getFullYear()}/${new Date().getFullYear() + 1}</p>
+                    </div>
+                    
+                    <div class="titulo-ficha">
+                        <h2>📄 FICHA DEL ALUMNO / ENTREGA DE LOTE</h2>
+                    </div>
+                    
+                    <div class="datos">
+                        <div class="dato"><strong>Código:</strong> ${alumnoData?.codigo_usuario || 'Sin código'}</div>
+                        <div class="dato"><strong>Nombre:</strong> ${alumnoData?.nombre || a.nombre} ${alumnoData?.apellidos || a.apellidos || ''}</div>
+                        <div class="dato"><strong>Curso:</strong> ${historialData?.curso || a.curso || '-'} ${historialData?.grupo || a.grupo || ''}</div>
+                        <div class="dato"><strong>Teléfono:</strong> ${historialData?.telefono || '-'}</div>
+                        <div class="dato"><strong>Bilingüe:</strong> ${historialData?.bilingue ? 'Sí' : 'No'}</div>
+                        <div class="dato"><strong>Beca:</strong> ${historialData?.beca ? 'Sí' : 'No'}</div>
+                        <div class="dato"><strong>Socio AMPA:</strong> ${historialData?.socio_ampa ? 'Sí' : 'No'}</div>
+                        <div class="dato"><strong>Donante:</strong> ${historialData?.donante ? 'Sí' : 'No'}</div>
+                    </div>
+                    
+                    <h3>📦 LIBROS DEL LOTE (${prestamosActivos?.length || 0})</h3>
+                    <table>
+                        <thead>
+                            <tr><th>Título</th><th>Materia</th><th>Curso</th><th>Editorial</th><th>Signatura</th></tr>
+                        </thead>
+                        <tbody>
+                            ${prestamosActivos?.map(p => `
+                                <tr>
+                                    <td>${p.libros?.titulo || '-'}</td>
+                                    <td>${p.libros?.materia || '-'}</td>
+                                    <td>${p.libros?.curso_para || '-'}</td>
+                                    <td>${p.libros?.editorial || '-'}</td>
+                                    <td>${p.libros?.signatura || '-'}</td>
+                                </tr>
+                            `).join('') || '<tr><td colspan="5">No hay libros asignados</td></tr>'}
+                        </tbody>
+                    </table>
+                    
+                    <div class="compromiso">
+                        <p><strong>📌 COMPROMISO DEL ALUMNO/A</strong></p>
+                        <p>El/la abajo firmante se compromete a hacer buen uso de los libros recibidos,<br>
+                        a devolverlos en el mismo estado en que los recibe al finalizar el curso académico,<br>
+                        y a comunicar cualquier pérdida o deterioro al departamento correspondiente.</p>
+                    </div>
+                    
+                    <div class="firma">
+                        <div class="firma-linea">
+                            <p>Firma del alumno/a</p>
+                            <hr>
+                        </div>
+                        <div class="firma-linea">
+                            <p>Firma del padre/madre/tutor</p>
+                            <hr>
+                        </div>
+                    </div>
+                    
+                    <div class="footer">
+                        <p>Instituto Victor García de la Concha - Villaviciosa | Banco de Libros</p>
+                        <p>Documento generado automáticamente - Fecha: ${new Date().toLocaleString()}</p>
+                    </div>
+                </div>
+            `);
+        }
+        
+        ventana.document.write(`
+            </body>
+            </html>
+        `);
+        ventana.document.close();
+    }   
     window.seleccionarAlumnoEntrega = async (alumnoId) => {
         const { data: alumno } = await supabase.from('alumnos').select('*').eq('id', alumnoId).single();
         const { data: historial } = await supabase.from('historial_alumnos').select('*').eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId).single();
