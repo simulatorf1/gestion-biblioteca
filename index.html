@@ -2136,7 +2136,6 @@
 
 
     async function buscarSociosMejorado() {
-        // USAR EL AÑO SELECCIONADO EN EL SELECTOR
         const anoId = currentAnoId;
         
         if (!anoId) {
@@ -2157,13 +2156,10 @@
         
         resultadosDiv.innerHTML = '<p>Buscando...</p>';
         
-        // Consultar historial del AÑO SELECCIONADO
         const { data: historiales, error } = await supabaseDebug
             .from('historial_alumnos')
             .select('*, alumnos(*)')
-            .eq('ano_academico_id', anoId);   // ← USAR anoId
-        
-
+            .eq('ano_academico_id', anoId);
         
         if (error) {
             resultadosDiv.innerHTML = `<p>Error: ${error.message}</p>`;
@@ -2186,10 +2182,7 @@
         
         // Filtros básicos
         if (codigoRaw) {
-            resultados = resultados.filter(a => {
-                const codigoAlumno = a.codigo_usuario ? String(a.codigo_usuario) : '';
-                return codigoAlumno.includes(codigoRaw);
-            });
+            resultados = resultados.filter(a => String(a.codigo_usuario || '').includes(codigoRaw));
         }
         if (nombreBusq) {
             resultados = resultados.filter(a => normalizarTexto(a.nombre || '').includes(nombreBusq));
@@ -2201,16 +2194,22 @@
             resultados = resultados.filter(a => a.curso === cursoFiltro);
         }
         
-        // Obtener información de socio (n_socio) para cada resultado
+        // OPTIMIZACIÓN: Una sola consulta para todos los socios
+        const idsAlumnos = resultados.map(a => a.id);
+        const { data: socios } = await supabaseDebug
+            .from('socios')
+            .select('alumno_id, n_socio')
+            .in('alumno_id', idsAlumnos)
+            .eq('ano_academico_id', anoId)
+            .eq('activo', true);
+        
+        const socioMap = {};
+        for (const s of socios || []) {
+            socioMap[s.alumno_id] = s.n_socio;
+        }
+        
         for (const alumno of resultados) {
-            const { data: socio } = await supabaseDebug
-                .from('socios')
-                .select('n_socio')
-                .eq('alumno_id', alumno.id)
-                .eq('ano_academico_id', anoId)
-                .eq('activo', true)
-                .maybeSingle();
-            alumno.n_socio = socio?.n_socio || null;
+            alumno.n_socio = socioMap[alumno.id] || null;
         }
         
         // Filtrar por estado socio
@@ -2223,7 +2222,6 @@
             return;
         }
         
-        // Mostrar resultados con el formato original de socios (no tabla de préstamos)
         let html = `<h3>Resultados (${resultados.length})</h3>`;
         
         for (const alumno of resultados) {
