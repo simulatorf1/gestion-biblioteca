@@ -2030,18 +2030,46 @@
         }
         
         // ========== DAR DE BAJA ALUMNO ==========
+        // ========== DAR DE BAJA ALUMNO ==========
         if(document.getElementById('bajaAlumnoBtn')) {
+            const alumnoIdLocal = alumnoId;  // Capturar el valor actual
+            const anoIdLocal = currentAnoId;  // Capturar el valor actual
+            
             document.getElementById('bajaAlumnoBtn').onclick = async () => {
                 if(confirm('¿Dar de baja a este alumno? Se conservará el historial.')) {
                     const motivo = prompt('Motivo de la baja:');
                     if(motivo) {
                         try {
-                            await supabase.from('bajas_alumnos').insert({ alumno_id: alumnoId, motivo: motivo });
-                            await supabase.from('historial_alumnos').update({ activo: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+                            console.log("Dando de baja - alumnoId:", alumnoIdLocal);
+                            console.log("Dando de baja - currentAnoId:", anoIdLocal);
+                            
+                            const { error: bajaError } = await supabase
+                                .from('bajas_alumnos')
+                                .insert({ alumno_id: alumnoIdLocal, motivo: motivo });
+                            
+                            if(bajaError) {
+                                console.error("Error en bajas_alumnos:", bajaError);
+                                alert("Error al registrar baja: " + bajaError.message);
+                                return;
+                            }
+                            
+                            const { error: updateError } = await supabase
+                                .from('historial_alumnos')
+                                .update({ activo: false })
+                                .eq('alumno_id', alumnoIdLocal)
+                                .eq('ano_academico_id', anoIdLocal);
+                            
+                            if(updateError) {
+                                console.error("Error al desactivar:", updateError);
+                                alert("Error al desactivar alumno: " + updateError.message);
+                                return;
+                            }
+                            
                             alert('Alumno dado de baja');
-                            await cargarAlumnos();
+                            cargarTab('alumnos');  // Volver a la lista de alumnos
+                            
                         } catch(error) {
-                            console.error("Error al dar de baja:", error);
+                            console.error("Error general:", error);
                             alert("Error: " + error.message);
                         }
                     }
