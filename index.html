@@ -1290,7 +1290,7 @@
             </div>
         `;
         
-        document.getElementById('btnConfirmarEntregaSeleccionado'c () => {
+        document.getElementById('btnConfirmarEntregaSeleccionado').onclick = async () => {
             await supabase.from('historial_alumnos').update({ lote_entregado: true, fecha_entrega: new Date().toISOString().slice(0,10) }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
             alert(`✅ Entrega confirmada para ${alumno.nombre}`);
             mostrarEntregarLote();
