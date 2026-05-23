@@ -1290,7 +1290,7 @@
             </div>
         `;
         
-        document.getElementById('btnConfirmarEntregaSeleccionado').onclick = async () => {
+        document.getElementById('btnConfirmarEntregaSeleccionado'c () => {
             await supabase.from('historial_alumnos').update({ lote_entregado: true, fecha_entrega: new Date().toISOString().slice(0,10) }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
             alert(`✅ Entrega confirmada para ${alumno.nombre}`);
             mostrarEntregarLote();
@@ -2031,14 +2031,19 @@
         
         // ========== DAR DE BAJA ALUMNO ==========
         if(document.getElementById('bajaAlumnoBtn')) {
-            document.getElementById('bajaAlumnoBtn').onclick = () => {
+            document.getElementById('bajaAlumnoBtn').onclick = async () => {
                 if(confirm('¿Dar de baja a este alumno? Se conservará el historial.')) {
                     const motivo = prompt('Motivo de la baja:');
                     if(motivo) {
-                        supabase.from('bajas_alumnos').insert({ alumno_id: alumnoId, motivo: motivo });
-                        supabase.from('historial_alumnos').update({ activo: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
-                        alert('Alumno dado de baja');
-                        cargarAlumnos();
+                        try {
+                            await supabase.from('bajas_alumnos').insert({ alumno_id: alumnoId, motivo: motivo });
+                            await supabase.from('historial_alumnos').update({ activo: false }).eq('alumno_id', alumnoId).eq('ano_academico_id', currentAnoId);
+                            alert('Alumno dado de baja');
+                            await cargarAlumnos();
+                        } catch(error) {
+                            console.error("Error al dar de baja:", error);
+                            alert("Error: " + error.message);
+                        }
                     }
                 }
             };
