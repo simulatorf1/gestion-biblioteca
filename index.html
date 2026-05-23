@@ -3310,7 +3310,7 @@
                     <td style="padding:6px; text-align:center;">${a.librosPrestados}</td>
                     <td style="padding:6px; font-weight:bold; color:${a.colorEstado};">${a.estado}</td>
                     <td style="padding:6px;">
-                        ${!a.yaEntregado && a.librosPrestados > 0 ? `<button onclick="seleccionarAlumnoPrepararConEstado(${a.id})" style="background:#10b981;">📦 Preparar lote</button>` : (a.yaEntregado ? '✅ Ya entregado' : '-')}
+                        ${!a.yaEntregado ? `<button onclick="seleccionarAlumnoPrepararConEstado(${a.id})" style="background:#10b981;">📦 Preparar lote</button>` : (a.yaEntregado ? '✅ Ya entregado' : '-')}                        
                     </td>
                 </tr>
             `;
