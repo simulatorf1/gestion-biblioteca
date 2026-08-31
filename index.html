@@ -333,6 +333,40 @@
         }    
         cargarTab(currentTab);
     }
+    // ============================================
+    // FUNCIÓN PARA OBTENER EL SIGUIENTE NÚMERO DE EJEMPLAR
+    // ============================================
+    async function obtenerSiguienteEjemplar(origen, curso, materia) {
+        try {
+            const { data, error } = await supabase
+                .from('libros')
+                .select('signatura')
+                .eq('origen', origen)
+                .eq('curso_para', curso || '')
+                .eq('materia', materia || '')
+                .not('signatura', 'is', null)
+                .order('signatura', { ascending: false })
+                .limit(1);
+            
+            if (error) {
+                console.error('Error:', error);
+                return null;
+            }
+            
+            if (data && data.length > 0) {
+                const match = data[0].signatura.match(/(\d+)$/);
+                if (match) {
+                    const numero = parseInt(match[1], 10) + 1;
+                    return numero.toString().padStart(3, '0');
+                }
+            }
+            return null;
+        } catch (e) {
+            console.error('Error:', e);
+            return null;
+        }
+    }
+    
     async function marcarAnoActivo() {
         const anoId = currentAnoId;
         if (!anoId) {
@@ -2525,14 +2559,31 @@
         document.getElementById('nuevaMateriaInput').addEventListener('input', actualizarSignatura);
         
         // Mostrar/ocultar buscador de donante según origen
-        document.getElementById('nuevoOrigen').addEventListener('change', function() {
+        document.getElementById('nuevoOrigen').addEventListener('change', async function() {
             const donanteDiv = document.getElementById('donanteDiv');
-            if (this.value === 'Donado') {
+            const sigEjemplar = document.getElementById('sigEjemplar');
+            const origen = this.value;
+            const ayudaSpan = document.getElementById('sigAyuda');
+            
+            if (origen === 'Donado') {
                 donanteDiv.style.display = 'block';
             } else {
                 donanteDiv.style.display = 'none';
                 document.getElementById('donanteId').value = '';
                 document.getElementById('resultadoDonante').innerHTML = '';
+            }
+            
+            // AHORA: auto-rellenar para TODOS los orígenes (IES, AMPA, Donado)
+            const cursoActual = document.getElementById('nuevoCurso').value;
+            const materiaActual = document.getElementById('nuevoMateria').value;
+            const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
+            
+            if (sugerido) {
+                sigEjemplar.value = sugerido;
+                if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente: ${sugerido}`;
+            } else {
+                sigEjemplar.value = '001';
+                if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente: 001`;
             }
         });
         
