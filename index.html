@@ -2540,7 +2540,7 @@
                 document.getElementById('resultadoDonante').innerHTML = '';
             }
             
-            // === AUTO-RELLENAR PARA TODOS LOS ORÍGENES (IES, AMPA, Donado) ===
+            // === AUTO-RELLENAR PARA TODOS LOS ORÍGENES ===
             const cursoActual = document.getElementById('nuevoCurso').value;
             const materiaActual = document.getElementById('nuevoMateria').value;
             const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
@@ -2553,6 +2553,14 @@
                 if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente: 001`;
             }
         });
+        
+        // === FORZAR EJECUCIÓN AL CARGAR (para IES por defecto) ===
+        setTimeout(async () => {
+            const origenSelect = document.getElementById('nuevoOrigen');
+            if (origenSelect) {
+                origenSelect.dispatchEvent(new Event('change'));
+            }
+        }, 300);
 
         
         // Buscar donante
