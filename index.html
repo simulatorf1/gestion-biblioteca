@@ -2525,7 +2525,7 @@
         document.getElementById('nuevaMateriaInput').addEventListener('input', actualizarSignatura);
         
         // Mostrar/ocultar buscador de donante según origen
-        // Mostrar/ocultar buscador de donante según origen y sugerir número de ejemplar
+        // Mostrar/ocultar buscador de donante según origen y CONSULTAR BD para número
         document.getElementById('nuevoOrigen').addEventListener('change', async function() {
             const donanteDiv = document.getElementById('donanteDiv');
             const sigEjemplar = document.getElementById('sigEjemplar');
@@ -2540,17 +2540,23 @@
                 document.getElementById('resultadoDonante').innerHTML = '';
             }
             
-            // === AUTO-RELLENAR PARA TODOS LOS ORÍGENES ===
+            // === CONSULTAR BD PARA TODOS LOS ORÍGENES (IES, AMPA, Donado) ===
             const cursoActual = document.getElementById('nuevoCurso').value;
             const materiaActual = document.getElementById('nuevoMateria').value;
+            
+            // Mostrar "Cargando..." mientras se consulta
+            if (sigEjemplar) sigEjemplar.placeholder = 'Cargando...';
+            
             const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
             
             if (sugerido) {
                 sigEjemplar.value = sugerido;
-                if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente: ${sugerido}`;
+                sigEjemplar.placeholder = '001';
+                if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: ${sugerido} (puedes modificarlo)`;
             } else {
                 sigEjemplar.value = '001';
-                if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente: 001`;
+                sigEjemplar.placeholder = '001';
+                if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: 001 (puedes modificarlo)`;
             }
         });
         
