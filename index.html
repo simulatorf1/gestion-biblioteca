@@ -171,6 +171,41 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtsd3JjbHdienZ1cHF4Y3hsanN0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg4MjExMTMsImV4cCI6MjA5NDM5NzExM30.GdcE2wSREkSt6DHjjs7L5MxYobdNZsz6wAvI_XvsGVk";
     
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // ============================================
+    // FUNCIÓN PARA OBTENER EL SIGUIENTE NÚMERO DE EJEMPLAR
+    // ============================================
+    async function obtenerSiguienteEjemplar(origen, curso, materia) {
+        try {
+            const { data, error } = await supabase
+                .from('libros')
+                .select('signatura')
+                .eq('origen', origen)
+                .eq('curso_para', curso || '')
+                .eq('materia', materia || '')
+                .not('signatura', 'is', null)
+                .order('signatura', { ascending: false })
+                .limit(1);
+            
+            if (error) {
+                console.error('Error al obtener siguiente ejemplar:', error);
+                return null;
+            }
+            
+            if (data && data.length > 0) {
+                const match = data[0].signatura.match(/(\d+)$/);
+                if (match) {
+                    const numero = parseInt(match[1], 10) + 1;
+                    return numero.toString().padStart(3, '0');
+                }
+            }
+            return null;
+        } catch (e) {
+            console.error('Error:', e);
+            return null;
+        }
+    }
+
+    
     // ==================== MATERIAS PREDEFINIDAS ====================
     const materiasPredefinidas = [
         { codigo: '01', nombre: 'Lengua y Literatura' },
