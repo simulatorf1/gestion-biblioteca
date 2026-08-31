@@ -2540,22 +2540,17 @@
                 document.getElementById('resultadoDonante').innerHTML = '';
             }
             
-            // Sugerir número automático para AMPA o Donado
-            if (origen === 'AMPA' || origen === 'Donado') {
-                const cursoActual = document.getElementById('nuevoCurso').value;
-                const materiaActual = document.getElementById('nuevoMateria').value;
-                const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
-                if (sugerido) {
-                    sigEjemplar.value = sugerido;
-                    ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: ${sugerido} (puedes modificarlo)`;
-                } else {
-                    const letra = origen === 'AMPA' ? 'A' : 'D';
-                    sigEjemplar.value = `001${letra}`;
-                    ayudaSpan.innerHTML = `📌 Sugerido automáticamente para origen ${origen}: 001${letra} (puedes modificarlo)`;
-                }
-            } else if (origen === 'IES') {
-                sigEjemplar.value = '';
-                ayudaSpan.innerHTML = `📌 Formato: Curso - Materia - Nº ejemplar (escribe el número manualmente)`;
+            // === AHORA: AUTO-RELLENAR PARA TODOS LOS ORÍGENES ===
+            const cursoActual = document.getElementById('nuevoCurso').value;
+            const materiaActual = document.getElementById('nuevoMateria').value;
+            const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
+            
+            if (sugerido) {
+                sigEjemplar.value = sugerido;
+                ayudaSpan.innerHTML = `📌 Sugerido automáticamente: ${sugerido}`;
+            } else {
+                sigEjemplar.value = '001';
+                ayudaSpan.innerHTML = `📌 Sugerido automáticamente: 001`;
             }
         });
 
