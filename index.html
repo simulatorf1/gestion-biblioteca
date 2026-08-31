@@ -2540,17 +2540,17 @@
                 document.getElementById('resultadoDonante').innerHTML = '';
             }
             
-            // === AHORA: AUTO-RELLENAR PARA TODOS LOS ORÍGENES ===
+            // === AUTO-RELLENAR PARA TODOS LOS ORÍGENES (IES, AMPA, Donado) ===
             const cursoActual = document.getElementById('nuevoCurso').value;
             const materiaActual = document.getElementById('nuevoMateria').value;
             const sugerido = await obtenerSiguienteEjemplar(origen, cursoActual, materiaActual);
             
             if (sugerido) {
                 sigEjemplar.value = sugerido;
-                ayudaSpan.innerHTML = `📌 Sugerido automáticamente: ${sugerido}`;
+                if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente: ${sugerido}`;
             } else {
                 sigEjemplar.value = '001';
-                ayudaSpan.innerHTML = `📌 Sugerido automáticamente: 001`;
+                if (ayudaSpan) ayudaSpan.innerHTML = `📌 Sugerido automáticamente: 001`;
             }
         });
 
